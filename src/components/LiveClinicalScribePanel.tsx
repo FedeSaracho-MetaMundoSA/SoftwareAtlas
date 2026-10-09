@@ -22,7 +22,7 @@ export interface ScribeExtractedPayload {
     edad: number;
     fechaNacimientoEstimada?: string;
     genero: 'Masculino' | 'Femenino' | 'No especificado';
-    perfilGrupo: PatientProfileGroup;
+    perfilGrupo?: PatientProfileGroup;
     profesion: string;
     ciudad: string;
     telefono?: string;
@@ -34,11 +34,11 @@ export interface ScribeExtractedPayload {
   anamnesisExtraida: {
     problemaDeHoy: string;
     diccionarioCliente: string[];
-    escoliosis: boolean;
-    cifosis: boolean;
-    lordosis: boolean;
-    asma: boolean;
-    tiroides: boolean;
+    escoliosis?: boolean;
+    cifosis?: boolean;
+    lordosis?: boolean;
+    asma?: boolean;
+    tiroides?: boolean;
     otrosAntecedentes: string;
     asimetriaPiernas?: string;
     desviacionCadera?: boolean;
@@ -170,15 +170,17 @@ export function parseLiveTranscriptLocally(
       ? 'Femenino'
       : 'Masculino'
     : 'No especificado';
-  const perfilGrupo: PatientProfileGroup =
+  const perfilGrupo: PatientProfileGroup | undefined =
     edad > 0 && edad < 16
       ? 'NIÑO'
-      : genero === 'Femenino'
+      : edad >= 16 && genero === 'Femenino'
       ? 'MUJER_ADULTA'
-      : 'ADULTO';
+      : edad >= 16 && genero === 'Masculino'
+      ? 'ADULTO'
+      : undefined;
 
   // 4. Extraer profesión
-  let profesion = edad > 0 && edad < 16 ? 'Estudiante' : 'No especificada';
+  let profesion = '';
   const profMatch = clean.match(
     /soy\s+(contador(?:a)?(?:\s+y\s+docente)?|arquitecto(?:a)?|profesor(?:a)?|docente|estudiante|abogado(?:a)?|ingeniero(?:a)?|comerciante|administrativo(?:a)?|chofer|médico(?:a)?|odontólogo(?:a)?)/i
   );
@@ -207,25 +209,53 @@ export function parseLiveTranscriptLocally(
   const horasSmartphoneDia = phoneMatch ? Number(phoneMatch[1]) : 0;
 
   // 7. Antecedentes
-  const escoliosis = lower.includes('escoliosis') || lower.includes('escoliótica');
-  const cifosis = lower.includes('cifosis') || lower.includes('encorva');
-  const lordosis = lower.includes('lordosis') || lower.includes('hiperlordosis');
-  const asma = lower.includes('asma');
-  const tiroides = lower.includes('tiroides') || lower.includes('hipotiroidismo');
+  const extractReportedCondition = (
+    terms: string[]
+  ): boolean | undefined => {
+    for (const term of terms) {
+      const index = lower.indexOf(term);
+      if (index < 0) continue;
+      const sentenceStart =
+        Math.max(
+          lower.lastIndexOf('.', index),
+          lower.lastIndexOf(';', index),
+          lower.lastIndexOf('!', index),
+          lower.lastIndexOf('?', index)
+        ) + 1;
+      const precedingWords = lower.slice(sentenceStart, index).trim();
+      const followingWords = lower.slice(index + term.length).trimStart();
+      if (/\b(no sabe|no recuerda|no está seguro)\b/.test(precedingWords)) {
+        return undefined;
+      }
+      if (
+        /\b(?:niega|sin)\b/.test(precedingWords) ||
+        /\bno\s+(?:tiene|presenta|padece|refiere|hay)\b/.test(precedingWords) ||
+        /^(?:no|ausente|negativo)\b/.test(followingWords)
+      ) {
+        return false;
+      }
+      return true;
+    }
+    return undefined;
+  };
+  const escoliosis = extractReportedCondition(['escoliosis', 'escoliótica']);
+  const cifosis = extractReportedCondition(['cifosis', 'encorva']);
+  const lordosis = extractReportedCondition(['lordosis', 'hiperlordosis']);
+  const asma = extractReportedCondition(['asma']);
+  const tiroides = extractReportedCondition(['tiroides', 'hipotiroidismo']);
 
   // 8. Diccionario del cliente
   const diccionarioCliente: string[] = [];
-  if (lower.includes('cintura trabada') || lower.includes('cintura rígida')) {
-    diccionarioCliente.push('Cintura trabada / rígida al levantarse');
-  }
-  if (lower.includes('pinchazo')) {
-    diccionarioCliente.push('Pinchazo lumbar al inclinarse');
-  }
-  if (lower.includes('mochila de plomo')) {
-    diccionarioCliente.push('Mochila de plomo en los hombros');
-  }
-  if (lower.includes('hombro derecho más alto')) {
-    diccionarioCliente.push('Hombro derecho más alto');
+  for (const expression of [
+    /cintura (?:trabada|rígida)[^,.!?]*/i,
+    /pinchazo[^,.!?]*/i,
+    /mochila de plomo[^,.!?]*/i,
+    /hombro derecho más alto/i,
+  ]) {
+    const phrase = clean.match(expression)?.[0]?.trim();
+    if (phrase && !diccionarioCliente.includes(phrase)) {
+      diccionarioCliente.push(phrase);
+    }
   }
   const problemaDeHoy = 'Pendiente de completar por el profesional.';
   const diagnosticoPrincipal = 'Pendiente de evaluación profesional.';
@@ -318,6 +348,7 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
   const [speakerRole, setSpeakerRole] = useState<'PACIENTE' | 'VILLALBA'>(
     'PACIENTE'
   );
+  const [isDemoTranscript, setIsDemoTranscript] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -611,6 +642,12 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
   const handleProcessFullConversationWithAI = async (
     customTranscript?: string
   ) => {
+    if (isDemoTranscript) {
+      setStatusBanner(
+        'La transcripción de demostración es ficticia y no se puede procesar como una consulta. Edítala o bórrala antes de continuar.'
+      );
+      return;
+    }
     const textToAnalyze = (customTranscript ?? transcript).trim();
     if (!textToAnalyze) {
       setStatusBanner(
@@ -707,12 +744,13 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
     scenario: 'ADULTO' | 'MUJER' | 'NINO'
   ) => {
     if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    setIsDemoTranscript(true);
     const lines = DEMO_DIALOGUE_LINES[scenario];
     let idx = 0;
     let accumulated = '';
     onTranscriptChange('');
     setStatusBanner(
-      '🎙️ Escuchando charla en tiempo real entre Juan Antonio Villalba (MP 542) y el paciente... Observa cómo se autocompletan Nombre, Apellido, Edad, Género y Hallazgos.'
+      'Demostración ficticia en curso. No se vinculará a un paciente, no se enviará a IA y no debe guardarse como consulta.'
     );
 
     simIntervalRef.current = setInterval(() => {
@@ -721,16 +759,17 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
           ? `${accumulated}\n${lines[idx]}`
           : lines[idx];
         onTranscriptChange(accumulated);
-        setMicVolume(Math.floor(45 + Math.random() * 45));
+        setMicVolume(0);
 
         const parsedNow = parseLiveTranscriptLocally(accumulated);
         setAutoDetectedFields(parsedNow);
-        onApplyExtractedData(parsedNow, accumulated);
         idx++;
       } else {
         if (simIntervalRef.current) clearInterval(simIntervalRef.current);
         setMicVolume(0);
-        handleProcessFullConversationWithAI(accumulated);
+        setStatusBanner(
+          'Demostración ficticia finalizada. Borra o reemplaza la transcripción para iniciar una consulta real.'
+        );
       }
     }, 950);
   };
@@ -738,6 +777,7 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
   const handleAddManualUtterance = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualUtterance.trim()) return;
+    setIsDemoTranscript(false);
     const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
     const secs = String(elapsedSeconds % 60).padStart(2, '0');
     const speakerLabel =
@@ -770,10 +810,10 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
             </span>
           </div>
           <h2 className="text-base sm:text-lg font-bold text-[#003366] mt-1">
-            🎙️📹 PROCESADOR EN VIVO DE CHARLA CLÍNICA (CÁMARA + MICRÓFONO + AUTOCOMPLETADO + INFORME COMPLETO)
+            🎙️📹 CAPTURA DE CHARLA — BORRADOR PARA REVISIÓN
           </h2>
           <p className="text-xs text-slate-600">
-            Escucha toda la conversación entre <strong>Juan Antonio Villalba (MP 542)</strong> y el paciente, transcribe cada frase, autocompleta Nombre, Apellido, Edad, Género, Profesión y Ficha Clínica, y redacta el Informe Completo automáticamente.
+            La transcripción y extracción asistida son borradores. Solo deben reflejar datos expresados; confirma cada campo. El sistema no diagnostica ni recomienda tratamientos.
           </p>
         </div>
 
@@ -804,14 +844,16 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
           <button
             type="button"
             onClick={() => handleProcessFullConversationWithAI()}
-            disabled={isProcessingGemini}
+            disabled={isProcessingGemini || isDemoTranscript}
             className="px-4 py-2.5 bg-[#1a5490] hover:bg-[#003366] text-white text-xs font-bold flex items-center gap-1.5 border-2 border-[#003366] cursor-pointer disabled:opacity-60"
           >
             <Sparkles className="w-4 h-4" />
             <span>
               {isProcessingGemini
-                ? 'Procesando Charla...'
-                : '[PROCESAR CHARLA → AUTOCOMPLETAR + INFORME COMPLETO]'}
+                ? 'Preparando borrador...'
+                : isDemoTranscript
+                ? 'Demostración ficticia (no procesable)'
+                : '[EXTRAER BORRADOR PARA REVISIÓN]'}
             </span>
           </button>
         </div>
@@ -880,7 +922,7 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
                     CÁMARA Y MICRÓFONO LISTOS
                   </div>
                   <div className="text-[11px] text-slate-400">
-                    Haz clic en [CONECTAR CÁMARA + MICRÓFONO EN VIVO] o prueba una charla simulada debajo
+                    Conecta cámara y micrófono o introduce una transcripción manual.
                   </div>
                 </div>
               )}
@@ -938,7 +980,7 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
             {/* Botones de prueba rápida de charla en vivo para demostrar autocompletado */}
             <div className="space-y-1">
               <div className="text-[10px] font-bold text-slate-500 uppercase">
-                Simular charla en vivo (Autocompletado automático):
+                Solo demostración ficticia (no se asocia ni guarda como consulta):
               </div>
               <div className="grid grid-cols-3 gap-1">
                 <button
@@ -984,6 +1026,7 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
               value={transcript}
               onChange={(e) => {
                 const val = e.target.value;
+                setIsDemoTranscript(false);
                 onTranscriptChange(val);
                 const local = parseLiveTranscriptLocally(val);
                 setAutoDetectedFields(local);

@@ -13,9 +13,6 @@ import {
   Upload,
   Video,
 } from 'lucide-react';
-import rxCervicalImg from '../assets/images/rx_cervical_lateral_1791388476879.jpg';
-import rmnLumbarImg from '../assets/images/rmn_lumbar_sagital_1791388492095.jpg';
-import rxEscoliosisImg from '../assets/images/rx_escoliosis_ap_1791388505857.jpg';
 import {
   LiveClinicalScribePanel,
   ScribeExtractedPayload,
@@ -45,6 +42,15 @@ function formatSeconds(totalSec: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+function formatClinicalDate(date: Date = new Date()): string {
+  return date.toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
   patients,
   initialPatientId,
@@ -58,7 +64,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
   );
   const [confirmCancelModal, setConfirmCancelModal] = useState(false);
   const [autoSaveTimestamp, setAutoSaveTimestamp] = useState<string>(
-    'Guardado automático'
+    'Los cambios se guardan al finalizar la consulta.'
   );
   const [showLiveScribePanel, setShowLiveScribePanel] = useState<boolean>(true);
   const [liveTranscript, setLiveTranscript] = useState<string>(
@@ -91,7 +97,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     'No especificado'
   );
   const [newPatProfesion, setNewPatProfesion] = useState('');
-  const [newPatCiudad, setNewPatCiudad] = useState('Salta');
+  const [newPatCiudad, setNewPatCiudad] = useState('');
   const [newPatTelefono, setNewPatTelefono] = useState('');
   const [newPatEmail, setNewPatEmail] = useState('');
 
@@ -111,86 +117,77 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
   const [profesion, setProfesion] = useState(
     initialConsultationToEdit?.anamnesis.profesion ||
       selectedPatient?.profesion ||
-      'Contador'
+      ''
   );
   const [ciudad, setCiudad] = useState(
     initialConsultationToEdit?.anamnesis.ciudad ||
       selectedPatient?.ciudad ||
-      'Salta'
+      ''
   );
   const [horasSedentario, setHorasSedentario] = useState(
     initialConsultationToEdit?.anamnesis.horasSedentarioDia ??
       selectedPatient?.horasSedentarioDia ??
-      8
+      undefined
   );
   const [horasComputadora, setHorasComputadora] = useState(
     initialConsultationToEdit?.anamnesis.horasComputadoraDia ??
       selectedPatient?.horasComputadoraDia ??
-      7
+      undefined
   );
   const [horasSmartphone, setHorasSmartphone] = useState(
     initialConsultationToEdit?.anamnesis.horasSmartphoneDia ??
       selectedPatient?.horasSmartphoneDia ??
-      5
+      undefined
   );
 
   // Campos específicos por perfil (Niño / Mujer Adulta / Adulto)
   const [pesoMochilaNino, setPesoMochilaNino] = useState(
-    initialConsultationToEdit?.anamnesis.contextoNino?.pesoMochilaKg ?? 5.5
+    initialConsultationToEdit?.anamnesis.contextoNino?.pesoMochilaKg ??
+    undefined
   );
   const [posturaEscolarNino, setPosturaEscolarNino] = useState(
-    initialConsultationToEdit?.anamnesis.contextoNino?.posturaEscolar ||
-      'Inclinación en pupitre + uso de celular en cama'
+    initialConsultationToEdit?.anamnesis.contextoNino?.posturaEscolar || ''
   );
   const [deporteInfancia, setDeporteInfancia] = useState(
     initialConsultationToEdit?.anamnesis.contextoAdulto?.deporteInfancia ||
       initialConsultationToEdit?.anamnesis.contextoNino?.deportesInfancia ||
-      'Básquetbol / Natación escolar'
+      ''
   );
   const [deporteActual, setDeporteActual] = useState(
     initialConsultationToEdit?.anamnesis.contextoAdulto?.deporteActual ||
       initialConsultationToEdit?.anamnesis.contextoNino?.deportesActuales ||
-      'Fútbol recreativo 1x/semana'
+      ''
   );
   const [hijosMujer, setHijosMujer] = useState(
-    initialConsultationToEdit?.anamnesis.contextoMujer?.cantidadHijos ?? 2
+    initialConsultationToEdit?.anamnesis.contextoMujer?.cantidadHijos ??
+    undefined
   );
   const [sobrecargaMujer, setSobrecargaMujer] = useState(
-    initialConsultationToEdit?.anamnesis.contextoMujer?.nivelSobrecarga1a10 ?? 8
+    initialConsultationToEdit?.anamnesis.contextoMujer?.nivelSobrecarga1a10 ??
+    undefined
   );
   const [diccionarioKeywords, setDiccionarioKeywords] = useState(
     (
       initialConsultationToEdit?.diccionarioCliente ||
-      selectedPatient?.diccionarioCliente || [
-        'Cintura trabada al levantarme de la silla',
-        'Pinchazo lumbar derecho al agacharme',
-      ]
+      selectedPatient?.diccionarioCliente || []
     ).join(' | ')
   );
 
   const [problemaHoy, setProblemaHoy] = useState(
-    initialConsultationToEdit?.anamnesis.problemaDeHoy ||
-      'Dolor en la espalda baja desde hace 3 meses de evolución, originado por sedentarismo y largo tiempo frente a computadora (8h/día). Refiere dolor tipo mecánico que mejora con reposo.'
+    initialConsultationToEdit?.anamnesis.problemaDeHoy || ''
   );
 
   // Grabación de audio/video en Paso 2
-  const [isRecordingStep2, setIsRecordingStep2] = useState(false);
-  const [step2Seconds, setStep2Seconds] = useState(
-    initialConsultationToEdit?.anamnesis.duracionAudioSegundos ?? 35
-  );
-  const [isPlayingStep2, setIsPlayingStep2] = useState(false);
-  const [audioSavedMsg, setAudioSavedMsg] = useState<string | null>(null);
-
   const [antecedentes, setAntecedentes] = useState(
     initialConsultationToEdit?.anamnesis.antecedentes || {
-      escoliosis: false,
-      cifosis: false,
-      lordosis: true,
-      asma: false,
-      tiroides: false,
+      escoliosis: undefined,
+      cifosis: undefined,
+      lordosis: undefined,
+      asma: undefined,
+      tiroides: undefined,
       otrosTexto: '',
-      asimetriaPiernas: 'Derecha -6 mm funcional',
-      desviacionCadera: true,
+      asimetriaPiernas: '',
+      desviacionCadera: undefined,
     }
   );
 
@@ -200,22 +197,9 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
-  const [isMicRecordingStep3, setIsMicRecordingStep3] = useState(false);
-  const [isMicPausedStep3, setIsMicPausedStep3] = useState(false);
-  const [step3Seconds, setStep3Seconds] = useState(
-    initialConsultationToEdit?.evaluacionClinica.duracionGrabacionSegundos ?? 135
-  );
-  const [micLevel, setMicLevel] = useState(55);
-
   const [notasClinicasTexto, setNotasClinicasTexto] = useState(
     (
       initialConsultationToEdit?.evaluacionClinica.notasTiempoReal || [
-        'Postura: Lordosis lumbar acentuada',
-        'Hombros: Asimetría derecha elevada',
-        'Cadera: Inclinación anterior',
-        'Dolor a la palpación L4-L5',
-        'Restricción de flexión: 30°',
-        'Fuerza glúteos: 4/5',
       ]
     ).join('\n')
   );
@@ -223,39 +207,35 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
 
   const [pruebasRealizadas, setPruebasRealizadas] = useState(
     initialConsultationToEdit?.evaluacionClinica.pruebasRealizadas || {
-      posturaEnPie: true,
-      movilidad: true,
+      posturaEnPie: false,
+      movilidad: false,
       fuerza: false,
       neurologico: false,
-      camillaSupino: true,
-      cadera: true,
+      camillaSupino: false,
+      cadera: false,
       palpacion: false,
       especiales: false,
     }
   );
 
   const [tablaFisica, setTablaFisica] = useState(
-    initialConsultationToEdit?.evaluacionClinica.tablaResultadosFisicos || [
-      { prueba: 'Flexión anterior', resultado: '30°' },
-      { prueba: 'Fuerza glúteos', resultado: '4/5' },
-      { prueba: 'Cadera abd.', resultado: 'Normal' },
-    ]
+    initialConsultationToEdit?.evaluacionClinica.tablaResultadosFisicos || []
   );
 
   // Fase 2.2 y 2.4: Eje Cadera, Relato Ciático y Psicología/Psicofármacos
   const [ejeCaderaHallazgo, setEjeCaderaHallazgo] = useState(
     initialConsultationToEdit?.evaluacionClinica.maniobrasEjeCadera
       ?.ejeCaderaCentroGravedad ||
-      'Aunque el paciente refiera síntoma superior o lumbar, evaluamos el eje principal: CADERA (centro de gravedad). Se detecta anteversión ilíaca derecha que altera toda la cadena cinética ascendente.'
+      ''
   );
   const [relatoCiatico, setRelatoCiatico] = useState(
     initialConsultationToEdit?.evaluacionClinica.maniobrasEjeCadera
       ?.relatoNervioCiatico ||
-      'Mientras se palpa L4-L5 y glúteo, se explica al paciente: "El nervio ciático va de tu cintura a tu pie", correlacionando el bloqueo de cadera con su síntoma en tiempo real.'
+      ''
   );
   const [medicacionPsicotropa, setMedicacionPsicotropa] = useState(
     initialConsultationToEdit?.evaluacionClinica.pruebaPsicologica
-      ?.medicacionPsicotropa || 'Ninguno (Sin psicofármacos activos)'
+      ?.medicacionPsicotropa || ''
   );
   const [actitudPsicologica, setActitudPsicologica] = useState<
     'Colaborador' | 'Defensivo' | 'Ansioso' | 'No evaluado'
@@ -266,74 +246,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
 
   // PASO 4: Visor DICOM y Análisis de Imágenes (Fase 3: 3.1 a 3.3)
   const [dicomStudies, setDicomStudies] = useState<DicomStudyItem[]>(
-    initialConsultationToEdit?.imagenes.estudiosHistorial || [
-      {
-        id: 'rad-1',
-        etiquetaCorta: 'Rad1',
-        fechaCorta: 'Oct 8',
-        estudio: 'Radiografía / RMN',
-        fechaCompleta: 'Oct 8, 2024',
-        region: 'Lumbar',
-        tecnica: 'RP (Frente / Sagital)',
-        corteOrientacion: 'Sagital (Lateral)',
-        imageUrl: rmnLumbarImg,
-        hallazgos: [
-          { texto: 'Rectificación L-dorsal', activo: true },
-          { texto: 'Listesis L4-L5 (Gr.1)', activo: true },
-          { texto: 'Osteofitos L5-S1', activo: true },
-        ],
-        impresion:
-          'Cambios degenerativos moderados. Compatible con antecedentes clínicos.',
-        anotacionesMedico:
-          'Señalar rectificación, hernias, etc. La anotación se guarda automáticamente en el expediente.',
-        trazosDibujo: [
-          {
-            x1: 38,
-            y1: 58,
-            x2: 62,
-            y2: 60,
-            tipo: 'regla',
-            etiqueta: 'L4-L5 (Gr.1)',
-          },
-        ],
-      },
-      {
-        id: 'rad-2',
-        etiquetaCorta: 'Rad2',
-        fechaCorta: 'Sep20',
-        estudio: 'Radiografía',
-        fechaCompleta: 'Sep 20, 2024',
-        region: 'Cervical',
-        tecnica: 'Lateral (Perfil)',
-        corteOrientacion: 'Sagital (Lateral)',
-        imageUrl: rxCervicalImg,
-        hallazgos: [
-          { texto: 'Rectificación L-dorsal', activo: true },
-          { texto: 'Pinzamiento C5-C6', activo: true },
-        ],
-        impresion: 'Rectificación cervical postural.',
-        anotacionesMedico: 'Control evolutivo cervical.',
-        trazosDibujo: [],
-      },
-      {
-        id: 'rad-3',
-        etiquetaCorta: 'Rad3',
-        fechaCorta: 'Aug15',
-        estudio: 'Espinograma',
-        fechaCompleta: 'Aug 15, 2024',
-        region: 'Toracolumbar',
-        tecnica: 'RP (Frente)',
-        corteOrientacion: 'Coronal (Frontal AP)',
-        imageUrl: rxEscoliosisImg,
-        hallazgos: [
-          { texto: 'Curva toracolumbar 12°', activo: true },
-          { texto: 'Basculación pélvica 4°', activo: true },
-        ],
-        impresion: 'Actitud escoliótica funcional compensatoria.',
-        anotacionesMedico: 'Estudio basal panorámico.',
-        trazosDibujo: [],
-      },
-    ]
+    initialConsultationToEdit?.imagenes.estudiosHistorial || []
   );
 
   const [activeDicomId, setActiveDicomId] = useState<string>(
@@ -355,91 +268,79 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
   const [ddConfirmada, setDdConfirmada] = useState(
     initialConsultationToEdit?.imagenes.diagnosticoDiferencialVisual
       ?.confirmada ||
-      'Síndrome facetario L4-L5 con anterolistesis grado I (Meyerding) y desbalance de eje cadera.'
+      ''
   );
   const [ddProbable, setDdProbable] = useState(
     initialConsultationToEdit?.imagenes.diagnosticoDiferencialVisual
       ?.probable ||
-      'Irritación mecánico-miofascial del nervio ciático proximal por tensión de psoas/piramidal.'
+      ''
   );
   const [ddDescartada, setDdDescartada] = useState(
     initialConsultationToEdit?.imagenes.diagnosticoDiferencialVisual
-      ?.descartada || 'Extrusión discal masiva o fractura vertebral.'
+      ?.descartada || ''
   );
   const [ddNoVisible, setDdNoVisible] = useState(
     initialConsultationToEdit?.imagenes.diagnosticoDiferencialVisual
-      ?.noVisible || 'Microinestabilidad ligamentaria en flexión dinámica.'
+      ?.noVisible || ''
   );
 
   // PASO 5: Motor de Protocolo Personalizado (Fase 4)
-  const [engineAnalysing, setEngineAnalysing] = useState(false);
-  const [engineProgressStep, setEngineProgressStep] = useState(5);
   const [isEditingDiagnosis, setIsEditingDiagnosis] = useState(false);
   const [isEditingProtocol, setIsEditingProtocol] = useState(false);
 
   const [diagnosticoPrincipal, setDiagnosticoPrincipal] = useState(
     initialConsultationToEdit?.protocolo.diagnosticoPrincipal ||
-      'Síndrome facetario lumbar L4-L5'
+      ''
   );
   const [diagnosticoSecundario, setDiagnosticoSecundario] = useState(
     initialConsultationToEdit?.protocolo.diagnosticoSecundario ||
-      'Secundario a rectificación L-dorsal'
+      ''
   );
   const [etiologia, setEtiologia] = useState(
     initialConsultationToEdit?.protocolo.etiologia ||
-      'Sedentarismo laboral prolongado + uso excesivo de pantallas + debilidad muscular de estabilizadores'
+      ''
   );
 
   const [fase1, setFase1] = useState(
     initialConsultationToEdit?.protocolo.fase1 || {
       titulo: 'FASE 1: Alivio agudo (4 semanas)',
-      ajustes: '2x/semana (L4-L5, cadera)',
-      complementos: 'Taping, hielo',
-      restriccion: 'Evitar flexión extrema',
+      ajustes: '',
+      complementos: '',
+      restriccion: '',
     }
   );
   const [fase2, setFase2] = useState(
     initialConsultationToEdit?.protocolo.fase2 || {
       titulo: 'FASE 2: Fortalecimiento (8 semanas)',
-      ajustes: '1x/semana',
-      ejercicios: '3x/semana (glúteos, core)',
-      ergonomia: 'Ajustes en oficina',
+      ajustes: '',
+      ejercicios: '',
+      ergonomia: '',
     }
   );
   const [fase3, setFase3] = useState(
     initialConsultationToEdit?.protocolo.fase3 || {
       titulo: 'FASE 3: Prevención (mantenimiento)',
-      ajustes: '1x/mes',
-      ejerciciosCasa: '5x/semana',
-      educacion: 'Posturas correctas',
+      ajustes: '',
+      ejerciciosCasa: '',
+      educacion: '',
     }
   );
   const [fase4, setFase4] = useState(
     initialConsultationToEdit?.protocolo.fase4 || {
       titulo: 'FASE 4: Optimización y Rendimiento Funcional',
-      optimizacionRendimiento:
-        'Corrección postural completa y readaptación deportiva',
-      integracionNeuromuscular:
-        'Integración de patrón neuromuscular de eje cadera-columna',
+      optimizacionRendimiento: '',
+      integracionNeuromuscular: '',
     }
   );
 
   const [objetivosCorto, setObjetivosCorto] = useState(
     (
-      initialConsultationToEdit?.protocolo.objetivosCortoPlazo || [
-        'Dolor: 8→4 (escala)',
-        'Flexión: 30→60°',
-        'Trabajar sin dolor',
-      ]
+      initialConsultationToEdit?.protocolo.objetivosCortoPlazo || []
     ).join('\n')
   );
   const [objetivosLargo, setObjetivosLargo] = useState(
     (
-      initialConsultationToEdit?.protocolo.objetivosLargoPlazo || [
-        'Mantener sin recaídas',
-        'Fuerza: 5/5 (glúteos)',
-        'Postura normolordótica',
-      ]
+      initialConsultationToEdit?.protocolo.objetivosLargoPlazo || []
     ).join('\n')
   );
 
@@ -468,10 +369,101 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     setAutoSaveTimestamp(`Paciente ${pat.nombreCompleto} seleccionado`);
   };
 
+  const handleStartNewPatient = () => {
+    setPatientMode('nuevo');
+    setNewPatNombre('');
+    setNewPatDob('');
+    setNewPatEdad(0);
+    setNewPatGenero('No especificado');
+    setNewPatProfesion('');
+    setNewPatCiudad('');
+    setNewPatTelefono('');
+    setNewPatEmail('');
+    setPerfilGrupo('ADULTO');
+    setProfesion('');
+    setCiudad('');
+    setHorasSedentario(undefined);
+    setHorasComputadora(undefined);
+    setHorasSmartphone(undefined);
+    setPesoMochilaNino(undefined);
+    setPosturaEscolarNino('');
+    setDeporteInfancia('');
+    setDeporteActual('');
+    setHijosMujer(undefined);
+    setSobrecargaMujer(undefined);
+    setDiccionarioKeywords('');
+    setProblemaHoy('');
+    setAntecedentes({
+      escoliosis: undefined,
+      cifosis: undefined,
+      lordosis: undefined,
+      asma: undefined,
+      tiroides: undefined,
+      otrosTexto: '',
+      asimetriaPiernas: '',
+      desviacionCadera: undefined,
+    });
+    setNotasClinicasTexto('');
+    setPruebasRealizadas({
+      posturaEnPie: false,
+      movilidad: false,
+      fuerza: false,
+      neurologico: false,
+      camillaSupino: false,
+      cadera: false,
+      palpacion: false,
+      especiales: false,
+    });
+    setTablaFisica([]);
+    setEjeCaderaHallazgo('');
+    setRelatoCiatico('');
+    setMedicacionPsicotropa('');
+    setActitudPsicologica('No evaluado');
+    setDicomStudies([]);
+    setActiveDicomId('');
+    setDdConfirmada('');
+    setDdProbable('');
+    setDdDescartada('');
+    setDdNoVisible('');
+    setDiagnosticoPrincipal('');
+    setDiagnosticoSecundario('');
+    setEtiologia('');
+    setFase1({
+      titulo: 'FASE 1',
+      ajustes: '',
+      complementos: '',
+      restriccion: '',
+    });
+    setFase2({
+      titulo: 'FASE 2',
+      ajustes: '',
+      ejercicios: '',
+      ergonomia: '',
+    });
+    setFase3({
+      titulo: 'FASE 3',
+      ajustes: '',
+      ejerciciosCasa: '',
+      educacion: '',
+    });
+    setFase4({
+      titulo: 'FASE 4',
+      optimizacionRendimiento: '',
+      integracionNeuromuscular: '',
+    });
+    setObjetivosCorto('');
+    setObjetivosLargo('');
+    setLiveTranscript('');
+    setInformeCompletoCharla(undefined);
+  };
+
   // Cálculo automático de edad al cambiar Fecha de Nacimiento
   const handleDobChange = (dobStr: string) => {
     setNewPatDob(dobStr);
-    if (!dobStr) return;
+    if (!dobStr) {
+      setNewPatEdad(0);
+      return;
+    }
     const birthDate = new Date(`${dobStr}T00:00:00`);
     const today = new Date();
     if (Number.isNaN(birthDate.getTime()) || birthDate > today) {
@@ -489,25 +481,6 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     }
     setNewPatEdad(age);
   };
-
-  // Timer de grabación en Paso 2
-  useEffect(() => {
-    if (!isRecordingStep2) return;
-    const interval = setInterval(() => {
-      setStep2Seconds((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isRecordingStep2]);
-
-  // Timer y nivel de micrófono en Paso 3
-  useEffect(() => {
-    if (!isMicRecordingStep3 || isMicPausedStep3) return;
-    const interval = setInterval(() => {
-      setStep3Seconds((prev) => prev + 1);
-      setMicLevel(Math.floor(35 + Math.random() * 55));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isMicRecordingStep3, isMicPausedStep3]);
 
   // Limpiar cámara al salir del Paso 3 o desmontar
   useEffect(() => {
@@ -548,24 +521,6 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     }
   };
 
-  const triggerAutomaticProtocolEngine = () => {
-    setEngineAnalysing(true);
-    setEngineProgressStep(1);
-    const t1 = setTimeout(() => setEngineProgressStep(2), 400);
-    const t2 = setTimeout(() => setEngineProgressStep(3), 800);
-    const t3 = setTimeout(() => setEngineProgressStep(4), 1200);
-    const t4 = setTimeout(() => {
-      setEngineProgressStep(5);
-      setEngineAnalysing(false);
-    }, 1600);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
-    };
-  };
-
   const activeDicomStudy =
     dicomStudies.find((s) => s.id === activeDicomId) || dicomStudies[0];
 
@@ -578,8 +533,8 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     if (!pendingPoint) {
       setPendingPoint({ x, y });
     } else {
-      const dist = Math.round(
-        Math.hypot(x - pendingPoint.x, y - pendingPoint.y) * 0.45
+      const relativeDistance = Math.round(
+        Math.hypot(x - pendingPoint.x, y - pendingPoint.y)
       );
       const nuevoTrazo = {
         x1: pendingPoint.x,
@@ -589,8 +544,8 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
         tipo: activeTool,
         etiqueta:
           activeTool === 'regla'
-            ? `${dist} mm / ${Math.round(dist * 1.1)}°`
-            : 'Marca',
+            ? `Distancia visual relativa: ${relativeDistance}% (sin calibrar)`
+            : 'Marca visual (sin interpretación clínica)',
       };
 
       setDicomStudies((prev) =>
@@ -601,38 +556,56 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
         )
       );
       setPendingPoint(null);
-      setAutoSaveTimestamp('Anotación guardada en imagen DICOM');
+      setAutoSaveTimestamp('Anotación añadida; se guardará al finalizar.');
     }
   };
 
   const handleUploadNewDicom = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setAutoSaveTimestamp(
+        'Formato no compatible: la vista previa admite JPEG, PNG y WebP; DICOM y PDF requieren un visor especializado.'
+      );
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setAutoSaveTimestamp('La imagen supera el límite de 2 MB para la vista previa local.');
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-      if (!dataUrl) return;
+      if (!dataUrl) {
+        setAutoSaveTimestamp('No se pudo leer el archivo de imagen.');
+        return;
+      }
       const newId = `rad-${Date.now()}`;
       const newStudy: DicomStudyItem = {
         id: newId,
         etiquetaCorta: `Rad${dicomStudies.length + 1}`,
-        fechaCorta: 'Hoy',
+        fechaCorta: 'Sin fecha',
         estudio: file.name.replace(/\.[^/.]+$/, ''),
-        fechaCompleta: 'Oct 10, 2024',
-        region: 'Columna Vertebral',
-        tecnica: 'DICOM / Digital',
-        corteOrientacion: 'Sagital (Lateral)',
+        fechaCompleta: 'Fecha del estudio no informada',
+        region: '',
+        tecnica: file.type,
         imageUrl: dataUrl,
-        hallazgos: [
-          { texto: 'Rectificación L-dorsal', activo: true },
-          { texto: 'Listesis L4-L5 (Gr.1)', activo: false },
-        ],
-        impresion: 'Estudio cargado en consulta actual.',
-        anotacionesMedico: 'Imagen incorporada para correlación clínica.',
+        hallazgos: [],
+        impresion: '',
+        anotacionesMedico: '',
         trazosDibujo: [],
       };
       setDicomStudies((prev) => [newStudy, ...prev]);
       setActiveDicomId(newId);
+      setAutoSaveTimestamp(
+        'Imagen cargada para revisión profesional; no se generaron hallazgos automáticos.'
+      );
+    };
+    reader.onerror = () => {
+      setAutoSaveTimestamp('No se pudo leer el archivo de imagen.');
     };
     reader.readAsDataURL(file);
   };
@@ -658,13 +631,13 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
           edad: newPatEdad,
           genero: newPatGenero,
           perfilGrupo,
-          profesion: profesion || newPatProfesion || 'Particular',
-          ciudad: ciudad || newPatCiudad || 'Salta',
+          profesion: profesion || newPatProfesion,
+          ciudad: ciudad || newPatCiudad,
           telefono: newPatTelefono.trim(),
           email: newPatEmail.trim(),
-          ultimaCita: 'Hoy',
-          proximaCita: 'Oct 17',
-          estado: 'Tratamiento',
+          ultimaCita: formatClinicalDate(),
+          proximaCita: '',
+          estado: 'Evaluación Inicial',
           horasSedentarioDia: horasSedentario,
           horasComputadoraDia: horasComputadora,
           horasSmartphoneDia: horasSmartphone,
@@ -694,8 +667,8 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
       perfilGrupo,
       pacienteProfesion: profesion,
       pacienteCiudad: ciudad,
-      fechaConsulta: 'Martes, 10 de Octubre de 2024',
-      estadoConsulta: 'Tratamiento',
+      fechaConsulta: formatClinicalDate(),
+      estadoConsulta: 'Evaluación Inicial',
       patologiaFiltro: diagnosticoPrincipal,
       diccionarioCliente: diccionarioKeywords
         .split('|')
@@ -708,7 +681,8 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
         horasComputadoraDia: horasComputadora,
         horasSmartphoneDia: horasSmartphone,
         problemaDeHoy: problemaHoy,
-        duracionAudioSegundos: step2Seconds,
+        duracionAudioSegundos:
+          initialConsultationToEdit?.anamnesis.duracionAudioSegundos ?? 0,
         antecedentes,
         contextoNino:
           perfilGrupo === 'NIÑO'
@@ -727,23 +701,22 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                 cantidadHijos: hijosMujer,
                 actividadesAdicionales: profesion,
                 nivelSobrecarga1a10: sobrecargaMujer,
-                actividadPostParto: deporteActual,
-                pesoActualKg: 64,
+                actividadPostParto: '',
               }
             : undefined,
         contextoAdulto:
           perfilGrupo === 'ADULTO'
             ? {
-                tipoTrabajo: 'oficina',
-                distanciaPantallaCm: 65,
                 deporteActual,
                 deporteInfancia,
-                soportesPosturales: 'Sin soporte lumbar previo',
+                soportesPosturales: '',
               }
             : undefined,
       },
       evaluacionClinica: {
-        duracionGrabacionSegundos: step3Seconds,
+        duracionGrabacionSegundos:
+          initialConsultationToEdit?.evaluacionClinica
+            .duracionGrabacionSegundos ?? 0,
         notasTiempoReal: notasClinicasTexto
           .split('\n')
           .map((l) => l.replace(/^•\s*/, '').trim())
@@ -752,23 +725,17 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
         tablaResultadosFisicos: tablaFisica,
         pruebaPsicologica: {
           actitud: actitudPsicologica,
-          humor: 'Neutral',
-          eventosVitales: 'Sobrecarga ocupacional/escolar evaluada',
+          humor: 'No evaluado',
+          eventosVitales: '',
           medicacionPsicotropa,
-          implicacionClinica:
-            medicacionPsicotropa !== 'Ninguno (Sin psicofármacos activos)'
-              ? 'Atención: Fármaco activo puede modular umbral de dolor y respuesta neuromuscular.'
-              : 'Respuesta neuromuscular y propioceptiva sin alteración farmacológica.',
+          implicacionClinica: '',
         },
         maniobrasEjeCadera: {
-          observacionDePie:
-            'Evaluación de plomada frontal, lateral y posterior completada.',
-          evaluacionCamilla:
-            'Pruebas de Thomas, Ober, Psoas y palpación segmentaria en decúbito.',
+          observacionDePie: '',
+          evaluacionCamilla: '',
           ejeCaderaCentroGravedad: ejeCaderaHallazgo,
           relatoNervioCiatico: relatoCiatico,
-          tonoMuscular:
-            'Hipertonía paravertebral defensiva en segmento primario.',
+          tonoMuscular: '',
         },
       },
       imagenes: {
@@ -782,8 +749,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
           probable: ddProbable,
           descartada: ddDescartada,
           noVisible: ddNoVisible,
-          impactoFuncionalPronostico:
-            'Reversible con corrección de eje de cadera, ajuste segmentario e higiene postural.',
+          impactoFuncionalPronostico: '',
         },
       },
       protocolo: {
@@ -798,52 +764,23 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
           .split('\n')
           .map((s) => s.replace(/^•\s*/, '').trim())
           .filter(Boolean),
-        objetivosMedianoPlazo: [
-          'Eliminar dolor agudo',
-          'Recuperar función completa',
-          'Fortalecimiento muscular 5/5',
-          'Independencia de tratamiento',
-        ],
+        objetivosMedianoPlazo: [],
         objetivosLargoPlazo: objetivosLargo
           .split('\n')
           .map((s) => s.replace(/^•\s*/, '').trim())
           .filter(Boolean),
-        proximaCitaFechaHora: 'Martes, 17 de Octubre de 2024 - 10:00 AM',
-        signosProgresoSemanas: {
-          semana1a2:
-            'Reducción del dolor agudo inicial y mayor libertad al levantarse.',
-          semana3a4:
-            'Incremento de amplitud articular (30° → 60°) y menor tensión muscular.',
-          semana5a8:
-            'Estabilización de cadera y core con fuerza 5/5 sin dolor laboral.',
-          semana9a12:
-            'Consolidación de hábitos posturales y prevención de recaídas.',
-        },
+        proximaCitaFechaHora: '',
         razonamientoMedico: {
           porQuePatologia: ddConfirmada,
           diferencialesDescartados: ddDescartada,
-          riesgosContraindicaciones:
-            perfilGrupo === 'NIÑO'
-              ? 'Técnicas suaves pediátricas adaptadas a cartílagos de crecimiento.'
-              : 'Evitar flexión/rotación extrema en segmento con listesis o dolor agudo.',
-          puntosContactoDireccionAjuste:
-            'Corrección primaria de eje de cadera/sacroilíaca + ajuste segmentario específico L4-L5 / C1.',
-          criteriosAlta:
-            'Ausencia de dolor, movilidad simétrica completa y autonomía en ejercicios domiciliarios.',
+          riesgosContraindicaciones: '',
+          puntosContactoDireccionAjuste: '',
+          criteriosAlta: '',
         },
       },
       transcripcionCharla: liveTranscript,
       informeCompletoCharla,
-      seguimientos: initialConsultationToEdit?.seguimientos || [
-        {
-          id: `seg-${Date.now()}`,
-          fecha: '2024-10-10',
-          dolorEva: 8,
-          flexionGrados: 30,
-          fuerzaGluteos: '4/5',
-          notaProgreso: 'Consulta inicial completada y protocolo generado.',
-        },
-      ],
+      seguimientos: initialConsultationToEdit?.seguimientos || [],
     };
   };
 
@@ -852,34 +789,35 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     payload: ScribeExtractedPayload,
     fullTranscript: string
   ) => {
+    const fullName =
+      `${payload.datosPaciente.nombre} ${payload.datosPaciente.apellidos}`.trim();
+    const existing = fullName
+      ? patients.find(
+          (p) => p.nombreCompleto.toLowerCase() === fullName.toLowerCase()
+        )
+      : undefined;
+
+    if (existing) {
+      handleSelectExistingPatient(existing);
+    } else if (fullName) {
+      handleStartNewPatient();
+    }
+
     setLiveTranscript(fullTranscript);
     setInformeCompletoCharla(payload.informeCompletoCharla);
 
-    const fullName =
-      `${payload.datosPaciente.nombre} ${payload.datosPaciente.apellidos}`.trim();
-
-    // Verificar si coincide con algún paciente existente o autocompletar como paciente nuevo
-    const existing = patients.find(
-      (p) =>
-        p.nombreCompleto.toLowerCase() === fullName.toLowerCase() ||
-        p.nombre.toLowerCase() === payload.datosPaciente.nombre.toLowerCase()
-    );
-
-    if (existing) {
-      setPatientMode('existente');
-      setSelectedPatientId(existing.id);
-    } else {
-      setPatientMode('nuevo');
+    if (fullName) {
+      setNewPatNombre(fullName);
     }
-
-    setNewPatNombre(fullName);
-    if (payload.datosPaciente.fechaNacimientoEstimada) {
-      setNewPatDob(payload.datosPaciente.fechaNacimientoEstimada);
+    if (!existing && payload.datosPaciente.genero !== 'No especificado') {
+      setNewPatGenero(payload.datosPaciente.genero);
     }
-    setNewPatEdad(payload.datosPaciente.edad);
-    setNewPatGenero(payload.datosPaciente.genero);
-    setNewPatProfesion(payload.datosPaciente.profesion);
-    setNewPatCiudad(payload.datosPaciente.ciudad);
+    if (!existing && payload.datosPaciente.profesion) {
+      setNewPatProfesion(payload.datosPaciente.profesion);
+    }
+    if (!existing && payload.datosPaciente.ciudad) {
+      setNewPatCiudad(payload.datosPaciente.ciudad);
+    }
     if (payload.datosPaciente.telefono) {
       setNewPatTelefono(payload.datosPaciente.telefono);
     }
@@ -888,12 +826,34 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     }
 
     // Paso 2: Anamnesis
-    setPerfilGrupo(payload.datosPaciente.perfilGrupo);
-    setProfesion(payload.datosPaciente.profesion);
-    setCiudad(payload.datosPaciente.ciudad);
-    setHorasSedentario(payload.datosPaciente.horasSedentarioDia);
-    setHorasComputadora(payload.datosPaciente.horasComputadoraDia);
-    setHorasSmartphone(payload.datosPaciente.horasSmartphoneDia);
+    if (
+      payload.datosPaciente.edad > 0 &&
+      (payload.datosPaciente.edad < 16 ||
+        payload.datosPaciente.genero !== 'No especificado')
+    ) {
+      setPerfilGrupo(
+        payload.datosPaciente.edad < 16
+          ? 'NIÑO'
+          : payload.datosPaciente.genero === 'Femenino'
+          ? 'MUJER_ADULTA'
+          : 'ADULTO'
+      );
+    }
+    if (!existing && payload.datosPaciente.profesion) {
+      setProfesion(payload.datosPaciente.profesion);
+    }
+    if (!existing && payload.datosPaciente.ciudad) {
+      setCiudad(payload.datosPaciente.ciudad);
+    }
+    if (!existing && payload.datosPaciente.horasSedentarioDia > 0) {
+      setHorasSedentario(payload.datosPaciente.horasSedentarioDia);
+    }
+    if (!existing && payload.datosPaciente.horasComputadoraDia > 0) {
+      setHorasComputadora(payload.datosPaciente.horasComputadoraDia);
+    }
+    if (!existing && payload.datosPaciente.horasSmartphoneDia > 0) {
+      setHorasSmartphone(payload.datosPaciente.horasSmartphoneDia);
+    }
     if (
       payload.anamnesisExtraida.problemaDeHoy !==
       'Pendiente de completar por el profesional.'
@@ -907,11 +867,11 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     }
     setAntecedentes((prev) => ({
       ...prev,
-      escoliosis: payload.anamnesisExtraida.escoliosis || prev.escoliosis,
-      cifosis: payload.anamnesisExtraida.cifosis || prev.cifosis,
-      lordosis: payload.anamnesisExtraida.lordosis || prev.lordosis,
-      asma: payload.anamnesisExtraida.asma || prev.asma,
-      tiroides: payload.anamnesisExtraida.tiroides || prev.tiroides,
+      escoliosis: payload.anamnesisExtraida.escoliosis ?? prev.escoliosis,
+      cifosis: payload.anamnesisExtraida.cifosis ?? prev.cifosis,
+      lordosis: payload.anamnesisExtraida.lordosis ?? prev.lordosis,
+      asma: payload.anamnesisExtraida.asma ?? prev.asma,
+      tiroides: payload.anamnesisExtraida.tiroides ?? prev.tiroides,
       otrosTexto:
         payload.anamnesisExtraida.otrosAntecedentes || prev.otrosTexto,
       asimetriaPiernas:
@@ -951,71 +911,14 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     ) {
       setRelatoCiatico(payload.evaluacionExtraida.relatoNervioCiatico);
     }
-    if (payload.evaluacionExtraida.actitudPsicologica) {
-      setActitudPsicologica(payload.evaluacionExtraida.actitudPsicologica);
-    }
     if (
       payload.evaluacionExtraida.medicacionPsicotropa !== 'No informado.'
     ) {
       setMedicacionPsicotropa(payload.evaluacionExtraida.medicacionPsicotropa);
     }
 
-    // Paso 5: Protocolo
-    if (
-      payload.protocoloExtraido.diagnosticoPrincipal !==
-      'Pendiente de evaluación profesional.'
-    ) {
-      setDiagnosticoPrincipal(payload.protocoloExtraido.diagnosticoPrincipal);
-      setDdConfirmada(payload.protocoloExtraido.diagnosticoPrincipal);
-    }
-    if (
-      payload.protocoloExtraido.diagnosticoSecundario !==
-      'Pendiente de revisión clínica.'
-    ) {
-      setDiagnosticoSecundario(payload.protocoloExtraido.diagnosticoSecundario);
-    }
-    if (
-      payload.protocoloExtraido.etiologia !==
-      'Pendiente de revisión clínica.'
-    ) {
-      setEtiologia(payload.protocoloExtraido.etiologia);
-    }
-
-    setFase1((prev) => ({
-      ...prev,
-      ajustes: payload.protocoloExtraido.fase1Ajustes || prev.ajustes,
-      complementos:
-        payload.protocoloExtraido.fase1Complementos || prev.complementos,
-      restriccion:
-        payload.protocoloExtraido.fase1Restriccion || prev.restriccion,
-    }));
-    setFase2((prev) => ({
-      ...prev,
-      ajustes: payload.protocoloExtraido.fase2Ajustes || prev.ajustes,
-      ejercicios: payload.protocoloExtraido.fase2Ejercicios || prev.ejercicios,
-      ergonomia: payload.protocoloExtraido.fase2Ergonomia || prev.ergonomia,
-    }));
-    setFase3((prev) => ({
-      ...prev,
-      ajustes: payload.protocoloExtraido.fase3Ajustes || prev.ajustes,
-      ejerciciosCasa:
-        payload.protocoloExtraido.fase3EjerciciosCasa || prev.ejerciciosCasa,
-      educacion: payload.protocoloExtraido.fase3Educacion || prev.educacion,
-    }));
-
-    if (payload.protocoloExtraido.objetivosCortoPlazo?.length) {
-      setObjetivosCorto(
-        payload.protocoloExtraido.objetivosCortoPlazo.join('\n')
-      );
-    }
-    if (payload.protocoloExtraido.objetivosLargoPlazo?.length) {
-      setObjetivosLargo(
-        payload.protocoloExtraido.objetivosLargoPlazo.join('\n')
-      );
-    }
-
     setAutoSaveTimestamp(
-      `Autocompletado en vivo: ${fullName} (${payload.datosPaciente.edad} años)`
+      'Borrador extraído de la charla; revisar y confirmar cada dato antes de guardar.'
     );
   };
 
@@ -1092,6 +995,20 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
           informeCharla={informeCompletoCharla}
           onApplyExtractedData={handleApplyLiveScribeExtraction}
           onJumpToFullReport={() => {
+            if (
+              patientMode === 'nuevo' &&
+              (!newPatNombre.trim() ||
+                !newPatDob ||
+                new Date(`${newPatDob}T00:00:00`) > new Date() ||
+                newPatEdad > 120 ||
+                newPatEdad < 0)
+            ) {
+              setStep(1);
+              setAutoSaveTimestamp(
+                'Complete y confirme la identidad y fecha de nacimiento antes de guardar el reporte.'
+              );
+              return;
+            }
             const record = buildFinalConsultationRecord();
             onSaveConsultation(record, true);
           }}
@@ -1118,7 +1035,6 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                 type="button"
                 onClick={() => {
                   setStep(idx as 1 | 2 | 3 | 4 | 5);
-                  if (idx === 5) triggerAutomaticProtocolEngine();
                 }}
                 title={`Ir al Paso ${idx}`}
                 className={`flex-1 h-full border-r border-white/50 transition-colors ${
@@ -1213,7 +1129,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                 type="radio"
                 name="patientMode"
                 checked={patientMode === 'nuevo'}
-                onChange={() => setPatientMode('nuevo')}
+                onChange={handleStartNewPatient}
                 className="w-4 h-4 accent-[#1a5490]"
               />
               <span>◯ Crear paciente nuevo</span>
@@ -1243,7 +1159,9 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                   <input
                     type="date"
                     value={newPatDob}
+                    max={new Date().toISOString().slice(0, 10)}
                     onChange={(e) => handleDobChange(e.target.value)}
+                    required
                     className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366] font-mono"
                   />
                 </div>
@@ -1253,10 +1171,10 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                   </label>
                   <input
                     type="number"
-                    min={1}
-                    max={105}
+                    min={0}
+                    max={120}
                     value={newPatEdad}
-                    onChange={(e) => setNewPatEdad(Number(e.target.value) || 1)}
+                    readOnly
                     className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366] font-mono"
                   />
                 </div>
@@ -1336,7 +1254,11 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
               onClick={() => {
                 if (
                   patientMode === 'nuevo' &&
-                  (!newPatNombre.trim() || newPatEdad < 1)
+                  (!newPatNombre.trim() ||
+                    !newPatDob ||
+                    new Date(`${newPatDob}T00:00:00`) > new Date() ||
+                    newPatEdad > 120 ||
+                    newPatEdad < 0)
                 ) {
                   return;
                 }
@@ -1359,19 +1281,20 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                     edad: newPatEdad,
                     genero: newPatGenero,
                     perfilGrupo: grupoAuto,
-                    profesion: newPatProfesion.trim() || 'Particular',
-                    ciudad: newPatCiudad.trim() || 'Salta',
+                    profesion: newPatProfesion.trim(),
+                    ciudad: newPatCiudad.trim(),
                     telefono: newPatTelefono.trim(),
                     email: newPatEmail.trim(),
-                    ultimaCita: 'Hoy',
-                    proximaCita: 'Oct 17',
+                    ultimaCita: formatClinicalDate(),
+                    proximaCita: '',
                     estado: 'Evaluación Inicial',
-                    horasSedentarioDia: 8,
-                    horasComputadoraDia: 6,
-                    horasSmartphoneDia: 4,
+                    horasSedentarioDia: horasSedentario,
+                    horasComputadoraDia: horasComputadora,
+                    horasSmartphoneDia: horasSmartphone,
                   };
                   onCreatePatient(created);
                   setSelectedPatientId(created.id);
+                  setPatientMode('existente');
                   setPerfilGrupo(grupoAuto);
                   setProfesion(created.profesion);
                   setCiudad(created.ciudad);
@@ -1380,7 +1303,11 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
               }}
               disabled={
                 patientMode === 'nuevo' &&
-                (!newPatNombre.trim() || newPatEdad < 1)
+                (!newPatNombre.trim() ||
+                  !newPatDob ||
+                  new Date(`${newPatDob}T00:00:00`) > new Date() ||
+                  newPatEdad > 120 ||
+                  newPatEdad < 0)
               }
               className="px-6 py-2.5 bg-[#1a5490] hover:bg-[#003366] text-white font-bold text-sm cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1469,8 +1396,12 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                     type="number"
                     min={0}
                     max={24}
-                    value={horasSedentario}
-                    onChange={(e) => setHorasSedentario(Number(e.target.value))}
+                    value={horasSedentario ?? ''}
+                    onChange={(e) =>
+                      setHorasSedentario(
+                        e.target.value === '' ? undefined : Number(e.target.value)
+                      )
+                    }
                     className="w-20 text-right font-mono font-bold text-sm text-[#003366] border border-[#E0E0E0] px-2 py-0.5"
                   />
                 </div>
@@ -1482,9 +1413,11 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                     type="number"
                     min={0}
                     max={24}
-                    value={horasComputadora}
+                    value={horasComputadora ?? ''}
                     onChange={(e) =>
-                      setHorasComputadora(Number(e.target.value))
+                      setHorasComputadora(
+                        e.target.value === '' ? undefined : Number(e.target.value)
+                      )
                     }
                     className="w-20 text-right font-mono font-bold text-sm text-[#003366] border border-[#E0E0E0] px-2 py-0.5"
                   />
@@ -1497,8 +1430,12 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                     type="number"
                     min={0}
                     max={24}
-                    value={horasSmartphone}
-                    onChange={(e) => setHorasSmartphone(Number(e.target.value))}
+                    value={horasSmartphone ?? ''}
+                    onChange={(e) =>
+                      setHorasSmartphone(
+                        e.target.value === '' ? undefined : Number(e.target.value)
+                      )
+                    }
                     className="w-20 text-right font-mono font-bold text-sm text-[#003366] border border-[#E0E0E0] px-2 py-0.5"
                   />
                 </div>
@@ -1516,9 +1453,13 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                       <input
                         type="number"
                         step="0.5"
-                        value={pesoMochilaNino}
+                        value={pesoMochilaNino ?? ''}
                         onChange={(e) =>
-                          setPesoMochilaNino(Number(e.target.value))
+                          setPesoMochilaNino(
+                            e.target.value === ''
+                              ? undefined
+                              : Number(e.target.value)
+                          )
                         }
                         className="w-20 border border-[#E0E0E0] bg-white px-2 py-1 font-mono font-bold text-right"
                       />
@@ -1548,9 +1489,13 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                         <input
                           type="number"
                           min={0}
-                          value={hijosMujer}
+                          value={hijosMujer ?? ''}
                           onChange={(e) =>
-                            setHijosMujer(Number(e.target.value))
+                            setHijosMujer(
+                              e.target.value === ''
+                                ? undefined
+                                : Number(e.target.value)
+                            )
                           }
                           className="w-full border border-[#E0E0E0] bg-white px-2 py-1 font-mono"
                         />
@@ -1563,9 +1508,13 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                           type="number"
                           min={1}
                           max={10}
-                          value={sobrecargaMujer}
+                          value={sobrecargaMujer ?? ''}
                           onChange={(e) =>
-                            setSobrecargaMujer(Number(e.target.value))
+                            setSobrecargaMujer(
+                              e.target.value === ''
+                                ? undefined
+                                : Number(e.target.value)
+                            )
                           }
                           className="w-full border border-[#E0E0E0] bg-white px-2 py-1 font-mono font-bold"
                         />
@@ -1602,132 +1551,41 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
             </div>
           </div>
 
-          {/* PROBLEMA DE HOY + MODAL DE GRABACIÓN INTEGRADO */}
+          {/* PROBLEMA DE HOY */}
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-[#003366]">
-              PROBLEMA DE HOY (Narrativa en Vivo + Diccionario del Cliente)
+              PROBLEMA DE HOY
             </h3>
-            <div className="flex flex-col md:flex-row items-stretch gap-4">
-              <div className="flex-1 border-2 border-[#E0E0E0] p-3 bg-white space-y-2">
-                <div className="text-xs text-slate-500">
-                  ¿Qué duele? Escribe o presiona REC (Dejar hablar 2-3 min):
-                </div>
-                <textarea
-                  rows={4}
-                  value={problemaHoy}
-                  onChange={(e) => setProblemaHoy(e.target.value)}
-                  className="w-full text-sm text-[#003366] focus:outline-none"
+            <div className="border-2 border-[#E0E0E0] p-3 bg-white space-y-2">
+              <div className="text-xs text-slate-500">
+                Registre el relato con sus propias notas. Esta versión no graba ni
+                almacena audio desde este formulario.
+              </div>
+              <textarea
+                rows={4}
+                value={problemaHoy}
+                onChange={(e) => setProblemaHoy(e.target.value)}
+                placeholder="Describa el motivo de consulta con las palabras del paciente."
+                className="w-full text-sm text-[#003366] focus:outline-none"
+              />
+              <div className="pt-2 border-t border-[#E0E0E0]">
+                <label className="block text-xs font-bold text-[#1a5490] mb-1">
+                  Frases textuales del paciente, separadas por |:
+                </label>
+                <input
+                  type="text"
+                  value={diccionarioKeywords}
+                  onChange={(e) => setDiccionarioKeywords(e.target.value)}
+                  className="w-full border border-[#E0E0E0] bg-[#F8FAFC] px-2.5 py-1 text-xs font-medium text-[#003366]"
                 />
-                <div className="pt-2 border-t border-[#E0E0E0]">
-                  <label className="block text-xs font-bold text-[#1a5490] mb-1">
-                    Diccionario del Cliente (Palabras clave de su relato separadas por |):
-                  </label>
-                  <input
-                    type="text"
-                    value={diccionarioKeywords}
-                    onChange={(e) => setDiccionarioKeywords(e.target.value)}
-                    className="w-full border border-[#E0E0E0] bg-[#F8FAFC] px-2.5 py-1 text-xs font-medium text-[#003366]"
-                  />
-                </div>
               </div>
-
-              <div className="w-full md:w-64 border-2 border-[#E0E0E0] p-4 bg-[#F8FAFC] flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[#003366] font-bold text-sm">
-                    <Mic
-                      className={`w-4 h-4 ${
-                        isRecordingStep2 ? 'text-[#E74C3C] animate-pulse' : ''
-                      }`}
-                    />
-                    <Video className="w-4 h-4 text-[#1a5490]" />
-                    <span>
-                      {isRecordingStep2
-                        ? '(Grabando)'
-                        : isPlayingStep2
-                        ? '(Reproduciendo)'
-                        : '(Listo)'}
-                    </span>
-                  </div>
-                  <span className="font-mono font-bold text-sm text-[#003366]">
-                    {formatSeconds(step2Seconds)}
-                  </span>
-                </div>
-
-                <div className="my-3">
-                  <div className="text-xs text-slate-500 mb-1">
-                    Nivel de audio:
-                  </div>
-                  <div className="h-2.5 w-full bg-[#ECEFF1] border border-[#E0E0E0] overflow-hidden">
-                    <div
-                      style={{
-                        width: isRecordingStep2
-                          ? '75%'
-                          : isPlayingStep2
-                          ? '60%'
-                          : '20%',
-                      }}
-                      className={`h-full transition-all ${
-                        isRecordingStep2 ? 'bg-[#E74C3C]' : 'bg-[#27AE60]'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRecordingStep2(!isRecordingStep2);
-                    setIsPlayingStep2(false);
-                  }}
-                  className={`w-full py-1.5 text-xs font-bold text-white ${
-                    isRecordingStep2 ? 'bg-[#E74C3C]' : 'bg-[#1a5490]'
-                  }`}
-                >
-                  {isRecordingStep2 ? 'DETENER REC' : '🎤 INICIAR REC'}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setIsRecordingStep2(false);
-                  setIsPlayingStep2(!isPlayingStep2);
-                }}
-                className="px-3.5 py-1.5 border-2 border-[#E0E0E0] bg-white hover:border-[#1a5490] text-xs font-bold text-[#003366]"
+                onClick={() => setShowLiveScribePanel(true)}
+                className="px-3.5 py-1.5 border-2 border-[#1a5490] text-xs font-bold text-[#1a5490]"
               >
-                [{isPlayingStep2 ? 'PAUSAR AUDIO' : 'REPRODUCIR'}]
+                Abrir panel de transcripción en vivo
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRecordingStep2(false);
-                  setIsPlayingStep2(false);
-                  setStep2Seconds(0);
-                  setAudioSavedMsg('Grabación reiniciada a 00:00');
-                }}
-                className="px-3.5 py-1.5 border-2 border-[#E0E0E0] bg-white hover:border-[#E74C3C] text-xs font-bold text-[#E74C3C]"
-              >
-                [BORRAR]
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRecordingStep2(false);
-                  setAudioSavedMsg(
-                    `Nota de voz (${formatSeconds(step2Seconds)}) y relato guardados en la anamnesis.`
-                  );
-                }}
-                className="px-3.5 py-1.5 border-2 border-[#27AE60] bg-[#27AE60] text-xs font-bold text-white"
-              >
-                [GUARDAR]
-              </button>
-              {audioSavedMsg && (
-                <span className="text-xs text-[#27AE60] font-semibold">
-                  ✓ {audioSavedMsg}
-                </span>
-              )}
             </div>
           </div>
 
@@ -1893,10 +1751,10 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                       [EN VIVO]
                     </span>
                     <div className="text-sm font-semibold mt-1">
-                      Paciente en cámara ({selectedPatient?.nombreCompleto})
+                      Vista de cámara inactiva
                     </div>
                     <div className="text-xs text-slate-300">
-                      Plomada Cabeza-Hombros-Caderas-Rodillas-Tobillos
+                      La guía visual no realiza análisis postural automático.
                     </div>
                   </div>
                 )}
@@ -1908,64 +1766,22 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
               </div>
             </div>
 
-            <div className="border-2 border-[#E0E0E0] p-4 bg-[#F8FAFC] flex flex-col justify-between">
-              <div className="space-y-3">
-                <div className="font-bold text-sm text-[#003366] flex items-center gap-1.5">
-                  <Mic className="w-4 h-4 text-[#1a5490]" />
-                  🎤 MICRÓFONO
-                </div>
-
-                <div className="space-y-1">
-                  <div className="text-xs font-semibold text-[#003366]">
-                    Nivel: ░░░░░ ({micLevel}%)
-                  </div>
-                  <div className="w-full h-4 bg-[#ECEFF1] border border-[#E0E0E0]">
-                    <div
-                      style={{ width: `${micLevel}%` }}
-                      className="h-full bg-[#27AE60] transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div className="text-base font-mono font-bold text-[#003366]">
-                  Grabando: {formatSeconds(step3Seconds)}
-                </div>
+            <div className="border-2 border-[#E0E0E0] p-4 bg-[#F8FAFC] flex flex-col justify-between gap-3">
+              <div className="font-bold text-sm text-[#003366] flex items-center gap-1.5">
+                <Mic className="w-4 h-4 text-[#1a5490]" />
+                Audio y transcripción
               </div>
-
-              <div className="flex items-center gap-2 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!isMicRecordingStep3) {
-                      setIsMicRecordingStep3(true);
-                      setIsMicPausedStep3(false);
-                    } else {
-                      setIsMicPausedStep3(!isMicPausedStep3);
-                    }
-                  }}
-                  className="flex-1 py-2 bg-[#1a5490] text-white text-xs font-bold flex items-center justify-center gap-1"
-                >
-                  {isMicRecordingStep3 && !isMicPausedStep3 ? (
-                    <>
-                      <Pause className="w-3.5 h-3.5" /> [PAUSAR]
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-3.5 h-3.5" /> [GRABAR / REANUDAR]
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMicRecordingStep3(false);
-                    setIsMicPausedStep3(false);
-                  }}
-                  className="flex-1 py-2 bg-[#E74C3C] text-white text-xs font-bold flex items-center justify-center gap-1"
-                >
-                  <Square className="w-3.5 h-3.5" /> [STOP]
-                </button>
-              </div>
+              <p className="text-xs text-slate-600">
+                La grabación y transcripción se realizan desde el panel de charla
+                en vivo. Este espacio no simula una captura de audio.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowLiveScribePanel(true)}
+                className="w-full py-2 bg-[#1a5490] text-white text-xs font-bold"
+              >
+                Abrir panel de charla en vivo
+              </button>
             </div>
           </div>
 
@@ -2053,12 +1869,12 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
           {/* ÉNFASIS EN EJE CADERA + RECORRIDO NERVIO CIÁTICO + PSICOLOGÍA (2.2 y 2.4) */}
           <div className="border-2 border-[#1a5490] bg-[#F8FAFC] p-4 space-y-3">
             <div className="text-xs font-bold text-[#1a5490]">
-              2.4 ÉNFASIS BIOMECÁNICO EN EJE CADERA (CENTRO DE GRAVEDAD) Y RECORRIDO CIÁTICO EN TIEMPO REAL
+              2.4 REGISTRO DE CADERA / PELVIS Y SÍNTOMAS RELACIONADOS
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div>
                 <label className="block font-bold text-[#003366] mb-1">
-                  Evaluación del Eje Principal (Cadera / Pelvis / Thomas / Ober):
+                  Hallazgos observados en cadera / pelvis (sin inferir causalidad):
                 </label>
                 <textarea
                   rows={3}
@@ -2069,7 +1885,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
               </div>
               <div>
                 <label className="block font-bold text-[#003366] mb-1">
-                  Relato Simultáneo del Nervio Ciático ("De la cintura al pie"):
+                  Síntomas o relato referido sobre trayecto ciático:
                 </label>
                 <textarea
                   rows={3}
@@ -2083,53 +1899,44 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#E0E0E0] text-xs">
               <div>
                 <label className="block font-bold text-[#003366] mb-1">
-                  2.2 Observación Psicológica en Consulta:
+                  Observación conductual durante la consulta (no diagnóstica):
                 </label>
                 <select
                   value={actitudPsicologica}
                   onChange={(e) =>
                     setActitudPsicologica(
-                      e.target.value as 'Colaborador' | 'Defensivo' | 'Ansioso'
+                      e.target.value as
+                        | 'Colaborador'
+                        | 'Defensivo'
+                        | 'Ansioso'
+                        | 'No evaluado'
                     )
                   }
                   className="w-full border border-[#E0E0E0] bg-white px-2.5 py-1.5 text-[#003366]"
                 >
+                  <option value="No evaluado">No evaluado / no informado</option>
                   <option value="Colaborador">
-                    Actitud: Colaborador / Coherente
+                    Observación: colaborador
                   </option>
                   <option value="Ansioso">
-                    Actitud: Ansioso / Preocupación manifiesta
+                    Observación: expresa preocupación
                   </option>
                   <option value="Defensivo">
-                    Actitud: Defensivo / Kinesiofobia
+                    Observación: actitud defensiva
                   </option>
                 </select>
               </div>
               <div>
                 <label className="block font-bold text-[#003366] mb-1">
-                  Medicación Psicótropa / Neuromoduladora:
+                  Medicación referida (sin inferir efectos):
                 </label>
-                <select
+                <input
+                  type="text"
                   value={medicacionPsicotropa}
                   onChange={(e) => setMedicacionPsicotropa(e.target.value)}
+                  placeholder="No informado"
                   className="w-full border border-[#E0E0E0] bg-white px-2.5 py-1.5 text-[#003366]"
-                >
-                  <option value="Ninguno (Sin psicofármacos activos)">
-                    Ninguno (Sin psicofármacos activos)
-                  </option>
-                  <option value="Ansiolíticos (Diazepam / Lorazepam) — Modifica tono muscular">
-                    Ansiolíticos (Diazepam / Lorazepam) — Modifica tono muscular
-                  </option>
-                  <option value="Pregabalina (Gabapentinoide) — Altera percepción de dolor">
-                    Pregabalina (Gabapentinoide) — Altera percepción de dolor
-                  </option>
-                  <option value="Antidepresivos — Considerar en respuesta central">
-                    Antidepresivos — Considerar en respuesta central
-                  </option>
-                  <option value="Opioides — Enmascara umbral doloroso agudo">
-                    Opioides — Enmascara umbral doloroso agudo
-                  </option>
-                </select>
+                />
               </div>
             </div>
           </div>
@@ -2188,23 +1995,60 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
       {/* ===================================================================
           PANTALLA 6: NUEVA CONSULTA - PASO 4 (Imágenes Médicas Fase 3)
          =================================================================== */}
+      {step === 4 && !activeDicomStudy && (
+        <div className="p-6 space-y-4">
+          <h3 className="text-sm font-bold text-[#003366]">
+            IMÁGENES CLÍNICAS — VISTA PREVIA LOCAL
+          </h3>
+          <p className="text-sm text-slate-600">
+            Todavía no hay imágenes adjuntas. Esta vista previa acepta JPEG,
+            PNG o WebP (máximo 2 MB); no interpreta estudios ni procesa DICOM o
+            PDF. Registre manualmente los datos y hallazgos confirmados por el
+            profesional.
+          </p>
+          <label className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#1a5490] text-white text-xs font-bold cursor-pointer">
+            <Upload className="w-3.5 h-3.5" />
+            <span>Adjuntar imagen JPEG / PNG / WebP</span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleUploadNewDicom}
+              className="hidden"
+            />
+          </label>
+          <div className="flex justify-end pt-4 border-t-2 border-[#E0E0E0]">
+            <button
+              type="button"
+              onClick={() => setStep(5)}
+              className="px-6 py-2.5 bg-[#1a5490] hover:bg-[#003366] text-white font-bold text-sm cursor-pointer"
+            >
+              Continuar sin imágenes
+            </button>
+          </div>
+        </div>
+      )}
       {step === 4 && activeDicomStudy && (
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-[#003366]">
-              VISOR DE IMÁGENES DICOM
+              VISTA PREVIA DE IMAGEN — SIN INTERPRETACIÓN AUTOMÁTICA
             </h3>
             <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a5490] text-white text-xs font-bold cursor-pointer">
               <Upload className="w-3.5 h-3.5" />
-              <span>+ Subir Imagen / DICOM</span>
+              <span>+ Adjuntar imagen</span>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleUploadNewDicom}
                 className="hidden"
               />
             </label>
           </div>
+          <p className="text-xs text-slate-600">
+            Solo JPEG, PNG o WebP hasta 2 MB. No admite ni interpreta archivos
+            DICOM o PDF; las marcas son visuales y no equivalen a mediciones
+            calibradas.
+          </p>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             <div className="md:col-span-7 space-y-4">
@@ -2329,7 +2173,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                             : 'bg-slate-800 border-slate-600 text-slate-200'
                         }`}
                       >
-                        <Ruler className="w-3 h-3" /> 📏 Medir
+                        <Ruler className="w-3 h-3" /> 📏 Trazar distancia relativa
                       </button>
                       {activeDicomStudy.trazosDibujo.length > 0 && (
                         <button
@@ -2450,11 +2294,13 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                   <strong>Fecha:</strong> {activeDicomStudy.fechaCompleta}
                 </div>
                 <div>
-                  <strong>Región:</strong> {activeDicomStudy.region}
+                  <strong>Región:</strong>{' '}
+                  {activeDicomStudy.region || 'No informada'}
                 </div>
                 <div>
-                  <strong>Técnica / Corte:</strong> {activeDicomStudy.tecnica} (
-                  {activeDicomStudy.corteOrientacion || 'Sagital'})
+                  <strong>Formato del archivo:</strong> {activeDicomStudy.tecnica}
+                  {activeDicomStudy.corteOrientacion &&
+                    ` (${activeDicomStudy.corteOrientacion})`}
                 </div>
               </div>
 
@@ -2558,11 +2404,11 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
               {/* 3.3 DIAGNÓSTICO DIFERENCIAL VISUAL (Confirmada, Probable, Descartada, No visible) */}
               <div className="border-2 border-[#E0E0E0] p-3.5 bg-[#F8FAFC] space-y-2 text-xs">
                 <div className="font-bold text-[#003366]">
-                  3.3 CORRELACIÓN IMAGEN-PACIENTE Y CERTEZA DIAGNÓSTICA
+                  REGISTRO PROFESIONAL DE HALLAZGOS (NO GENERADO POR EL SISTEMA)
                 </div>
                 <div>
                   <span className="font-bold text-[#27AE60] block">
-                    ✓ Patología Confirmada:
+                    Confirmada por profesional:
                   </span>
                   <input
                     type="text"
@@ -2573,7 +2419,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                 </div>
                 <div>
                   <span className="font-bold text-[#1a5490] block">
-                    • Patología Probable:
+                    Posible (requiere criterio profesional):
                   </span>
                   <input
                     type="text"
@@ -2584,7 +2430,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                 </div>
                 <div>
                   <span className="font-bold text-[#E74C3C] block">
-                    ✕ Patología Descartada:
+                    Descartada por profesional:
                   </span>
                   <input
                     type="text"
@@ -2595,7 +2441,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                 </div>
                 <div>
                   <span className="font-bold text-slate-600 block">
-                    ◌ Patología No Visible en esta imagen:
+                    No evaluable en esta imagen:
                   </span>
                   <input
                     type="text"
@@ -2613,7 +2459,6 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
               type="button"
               onClick={() => {
                 setStep(5);
-                triggerAutomaticProtocolEngine();
               }}
               className="px-6 py-2.5 bg-[#1a5490] hover:bg-[#003366] text-white font-bold text-sm cursor-pointer"
             >
@@ -2628,64 +2473,19 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
          =================================================================== */}
       {step === 5 && (
         <div className="p-6 space-y-6">
-          <div className="border-2 border-[#E0E0E0] p-4 bg-[#F8FAFC] space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="font-bold text-sm text-[#003366]">
-                🤖 MOTOR DE PROTOCOLO AUTOMÁTICO ({perfilGrupo.replace('_', ' ')})
-              </div>
-              <button
-                type="button"
-                onClick={triggerAutomaticProtocolEngine}
-                className="text-xs font-semibold text-[#1a5490] hover:underline"
-              >
-                ↻ Re-analizar correlación clínica
-              </button>
+          <div className="border-2 border-amber-300 p-4 bg-amber-50 space-y-1">
+            <div className="font-bold text-sm text-amber-900">
+              Revisión profesional requerida
             </div>
-            <div className="text-xs text-slate-600">
-              {engineAnalysing
-                ? 'Analizando datos... ⏳ (30 segundos)'
-                : 'Análisis completado ✓ (Correlación Cuadro Clínico + Imagen + Contexto de Vida)'}
-            </div>
-            <div className="space-y-1 text-xs font-medium text-[#003366] pt-1">
-              <div
-                className={
-                  engineProgressStep >= 1 ? 'text-[#27AE60]' : 'text-slate-400'
-                }
-              >
-                ✓ Anamnesis procesada
-              </div>
-              <div
-                className={
-                  engineProgressStep >= 2 ? 'text-[#27AE60]' : 'text-slate-400'
-                }
-              >
-                ✓ Evaluación física correlacionada (Eje Cadera + Columna)
-              </div>
-              <div
-                className={
-                  engineProgressStep >= 3 ? 'text-[#27AE60]' : 'text-slate-400'
-                }
-              >
-                ✓ Imágenes analizadas
-              </div>
-              <div
-                className={
-                  engineProgressStep >= 4 ? 'text-[#27AE60]' : 'text-slate-400'
-                }
-              >
-                ✓ Diagnóstico diferencial generado
-              </div>
-              <div className="text-[#1a5490] font-bold">
-                ▶{' '}
-                {engineAnalysing
-                  ? 'Generando protocolo personalizado...'
-                  : 'Protocolo personalizado listo'}
-              </div>
-            </div>
+            <p className="text-xs text-amber-900">
+              Este prototipo no analiza hallazgos ni genera diagnósticos,
+              pronósticos o tratamientos. Complete únicamente lo evaluado y
+              decidido por el profesional responsable.
+            </p>
           </div>
 
           <h3 className="text-sm font-bold text-[#003366]">
-            PROTOCOLO SUGERIDO
+            PLAN CLÍNICO REGISTRADO POR EL PROFESIONAL
           </h3>
 
           {/* 📋 DIAGNÓSTICO PRINCIPAL */}

@@ -126,7 +126,7 @@ async function startServer() {
     }
   });
 
-  // 2. Endpoint para procesar toda la charla en vivo, autocompletar datos fundamentales y generar el Informe Completo
+  // 2. Extract only statements made in the consultation; clinical decisions remain manual.
   app.post('/api/clinical-scribe/extract', async (req, res) => {
     try {
       const { transcript, cameraSnapshotBase64 } = req.body || {};
@@ -157,10 +157,12 @@ async function startServer() {
       }
 
       parts.push({
-        text: `Eres el motor clínico especializado del consultorio quiropráctico de Juan Antonio Villalba (MP 542) — ATLAS Columna Vertebral.
-Analiza la siguiente transcripción en tiempo real de la consulta entre el quiropráctico Juan Antonio Villalba (MP 542) y el paciente.
-Extrae y autocompleta TODOS los datos fundamentales mencionados (nombre, apellido, edad, género, profesión, ciudad, horas de sedentarismo/computadora/celular, motivo de consulta, diccionario del paciente, antecedentes, hallazgos del eje de cadera y nervio ciático, diagnóstico, protocolo en 4 fases) y redacta un INFORME CLÍNICO COMPLETO de toda la charla.
-Si algún dato técnico del protocolo no fue dicho explícitamente aún, infiere la recomendación quiropráctica clínica más coherente según la edad, género y síntomas relatados en la charla.
+        text: `Extrae datos literales de esta conversación para crear un borrador que un profesional revisará.
+No diagnostiques, no interpretes estudios o imágenes, no infieras etiologías, pronósticos, riesgos, contraindicaciones, tratamientos, ejercicios ni recomendaciones.
+No completes información faltante por contexto, edad, género, nombre, profesión ni frases del profesional. No conviertas una sospecha en un hallazgo confirmado.
+Usa únicamente hechos explícitamente dichos. Para campos de texto no mencionados devuelve una cadena vacía; para números no mencionados devuelve 0; para listas sin datos devuelve una lista vacía. En antecedentes devuelve true solo cuando el paciente/profesional afirme explícitamente que existe, false solo cuando lo niegue explícitamente; si no se menciona, omite el campo.
+No estimes la fecha de nacimiento a partir de la edad. Distingue hechos referidos por el paciente de observaciones expresadas explícitamente por el profesional.
+El informe debe resumir lo dicho, señalar lo que no se informó y no presentar consejo médico ni un plan de tratamiento.
 
 TRANSCRIPCIÓN DE LA CHARLA CLÍNICA:
 """
@@ -193,7 +195,7 @@ ${transcript}
                   },
                   fechaNacimientoEstimada: {
                     type: Type.STRING,
-                    description: 'Fecha de nacimiento en formato YYYY-MM-DD si se menciona o calcula.',
+                    description: 'Fecha exacta YYYY-MM-DD solo si se expresa literalmente; en otro caso cadena vacía.',
                   },
                   genero: {
                     type: Type.STRING,
@@ -201,7 +203,7 @@ ${transcript}
                   },
                   perfilGrupo: {
                     type: Type.STRING,
-                    description: 'NIÑO (si <16 años), MUJER_ADULTA (si mujer >=16), o ADULTO (si hombre >=16).',
+                    description: 'Solo si la edad y el género fueron expresados; de otro modo cadena vacía.',
                   },
                   profesion: {
                     type: Type.STRING,
@@ -217,15 +219,15 @@ ${transcript}
                   },
                   horasSedentarioDia: {
                     type: Type.INTEGER,
-                    description: 'Horas sentado o sedentario por día.',
+                    description: 'Horas explícitamente declaradas; usa 0 si no se informaron.',
                   },
                   horasComputadoraDia: {
                     type: Type.INTEGER,
-                    description: 'Horas frente a computadora por día.',
+                    description: 'Horas explícitamente declaradas; usa 0 si no se informaron.',
                   },
                   horasSmartphoneDia: {
                     type: Type.INTEGER,
-                    description: 'Horas de uso de celular/smartphone por día.',
+                    description: 'Horas explícitamente declaradas; usa 0 si no se informaron.',
                   },
                 },
                 required: [
@@ -246,7 +248,7 @@ ${transcript}
                 properties: {
                   problemaDeHoy: {
                     type: Type.STRING,
-                    description: 'Síntesis clínica completa del motivo de consulta relatado en la charla.',
+                    description: 'Resumen literal del motivo referido; cadena vacía si no está informado.',
                   },
                   diccionarioCliente: {
                     type: Type.ARRAY,
@@ -269,11 +271,6 @@ ${transcript}
                 required: [
                   'problemaDeHoy',
                   'diccionarioCliente',
-                  'escoliosis',
-                  'cifosis',
-                  'lordosis',
-                  'asma',
-                  'tiroides',
                 ],
               },
               evaluacionExtraida: {
@@ -286,11 +283,11 @@ ${transcript}
                   },
                   ejeCaderaCentroGravedad: {
                     type: Type.STRING,
-                    description: 'Evaluación del eje principal de cadera y pelvis como centro de gravedad.',
+                    description: 'Solo observación que el profesional haya expresado literalmente; sin inferencias.',
                   },
                   relatoNervioCiatico: {
                     type: Type.STRING,
-                    description: 'Explicación y correlación del recorrido del nervio ciático de la cintura al pie.',
+                    description: 'Solo contenido expresado literalmente en la charla; sin inferencias.',
                   },
                   actitudPsicologica: {
                     type: Type.STRING,
@@ -318,18 +315,18 @@ ${transcript}
               protocoloExtraido: {
                 type: Type.OBJECT,
                 properties: {
-                  diagnosticoPrincipal: { type: Type.STRING },
-                  diagnosticoSecundario: { type: Type.STRING },
-                  etiologia: { type: Type.STRING },
-                  fase1Ajustes: { type: Type.STRING },
-                  fase1Complementos: { type: Type.STRING },
-                  fase1Restriccion: { type: Type.STRING },
-                  fase2Ajustes: { type: Type.STRING },
-                  fase2Ejercicios: { type: Type.STRING },
-                  fase2Ergonomia: { type: Type.STRING },
-                  fase3Ajustes: { type: Type.STRING },
-                  fase3EjerciciosCasa: { type: Type.STRING },
-                  fase3Educacion: { type: Type.STRING },
+                  diagnosticoPrincipal: { type: Type.STRING, description: 'Solo transcribir si el profesional lo nombra como diagnóstico; si no, cadena vacía.' },
+                  diagnosticoSecundario: { type: Type.STRING, description: 'Solo transcribir si se declara explícitamente; si no, cadena vacía.' },
+                  etiologia: { type: Type.STRING, description: 'Solo transcribir si se declara explícitamente; no inferir causas.' },
+                  fase1Ajustes: { type: Type.STRING, description: 'Solo transcribir si se indica explícitamente; no recomendar.' },
+                  fase1Complementos: { type: Type.STRING, description: 'Solo transcribir si se indica explícitamente; no recomendar.' },
+                  fase1Restriccion: { type: Type.STRING, description: 'Solo transcribir si se indica explícitamente; no recomendar.' },
+                  fase2Ajustes: { type: Type.STRING, description: 'Solo transcribir si se indica explícitamente; no recomendar.' },
+                  fase2Ejercicios: { type: Type.STRING, description: 'Solo transcribir si se indica explícitamente; no recomendar.' },
+                  fase2Ergonomia: { type: Type.STRING, description: 'Solo transcribir si se indica explícitamente; no recomendar.' },
+                  fase3Ajustes: { type: Type.STRING, description: 'Solo transcribir si se indica explícitamente; no recomendar.' },
+                  fase3EjerciciosCasa: { type: Type.STRING, description: 'Solo transcribir si se indica explícitamente; no recomendar.' },
+                  fase3Educacion: { type: Type.STRING, description: 'Solo transcribir si se indica explícitamente; no recomendar.' },
                   objetivosCortoPlazo: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING },
@@ -359,11 +356,11 @@ ${transcript}
                   },
                   correlacionBiomecanicaEjeCadera: {
                     type: Type.STRING,
-                    description: 'Explicación clínica de la relación entre eje de cadera, columna y sintomatología.',
+                    description: 'Resumen de correlaciones dichas explícitamente; en otro caso cadena vacía.',
                   },
                   planTerapeuticoDetallado: {
                     type: Type.STRING,
-                    description: 'Plan de acción quiropráctico propuesto por Juan Antonio Villalba MP 542.',
+                    description: 'Solo transcripción literal de un plan expresamente indicado; nunca propongas un plan.',
                   },
                 },
                 required: [

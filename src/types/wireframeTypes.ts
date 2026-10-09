@@ -41,9 +41,9 @@ export interface PatientRecord {
   ultimaCita: string;
   proximaCita: string;
   estado: PatientStatus;
-  horasSedentarioDia: number;
-  horasComputadoraDia: number;
-  horasSmartphoneDia: number;
+  horasSedentarioDia?: number;
+  horasComputadoraDia?: number;
+  horasSmartphoneDia?: number;
   diccionarioCliente?: string[];
 }
 
@@ -105,40 +105,40 @@ export interface ConsultationRecord {
   anamnesis: {
     profesion: string;
     ciudad: string;
-    horasSedentarioDia: number;
-    horasComputadoraDia: number;
-    horasSmartphoneDia: number;
+    horasSedentarioDia?: number;
+    horasComputadoraDia?: number;
+    horasSmartphoneDia?: number;
     problemaDeHoy: string;
     duracionAudioSegundos: number;
     antecedentes: {
-      escoliosis: boolean;
-      cifosis: boolean;
-      lordosis: boolean;
-      asma: boolean;
-      tiroides: boolean;
+      escoliosis?: boolean;
+      cifosis?: boolean;
+      lordosis?: boolean;
+      asma?: boolean;
+      tiroides?: boolean;
       otrosTexto: string;
       asimetriaPiernas?: string;
       desviacionCadera?: boolean;
       gradoEscoliosis?: string;
     };
     contextoNino?: {
-      horasClaseDia: number;
+      horasClaseDia?: number;
       posturaEscolar: string;
       deportesActuales: string;
       deportesInfancia: string;
-      pesoMochilaKg: number;
+      pesoMochilaKg?: number;
       posturasHabituales: string;
     };
     contextoMujer?: {
-      cantidadHijos: number;
+      cantidadHijos?: number;
       actividadesAdicionales: string;
-      nivelSobrecarga1a10: number;
+      nivelSobrecarga1a10?: number;
       actividadPostParto: string;
-      pesoActualKg: number;
+      pesoActualKg?: number;
     };
     contextoAdulto?: {
-      tipoTrabajo: 'oficina' | 'campo' | 'mixto';
-      distanciaPantallaCm: number;
+      tipoTrabajo?: 'oficina' | 'campo' | 'mixto';
+      distanciaPantallaCm?: number;
       deporteActual: string;
       deporteInfancia: string;
       soportesPosturales: string;
@@ -176,7 +176,7 @@ export interface ConsultationRecord {
     };
     pruebaPsicologica?: {
       actitud: 'Colaborador' | 'Defensivo' | 'Ansioso' | 'No evaluado';
-      humor: 'Neutral' | 'Ansioso' | 'Deprimido' | 'Eufórico';
+      humor: 'Neutral' | 'Ansioso' | 'Deprimido' | 'Eufórico' | 'No evaluado';
       eventosVitales: string;
       medicacionPsicotropa: string;
       implicacionClinica: string;
