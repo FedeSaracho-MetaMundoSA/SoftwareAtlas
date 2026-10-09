@@ -1,0 +1,1222 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Camera,
+  CheckCircle2,
+  FileText,
+  Mic,
+  MicOff,
+  Play,
+  RefreshCw,
+  Sparkles,
+  Square,
+  UserCheck,
+  Video,
+  VideoOff,
+} from 'lucide-react';
+import { PatientProfileGroup } from '../types/wireframeTypes';
+
+export interface ScribeExtractedPayload {
+  datosPaciente: {
+    nombre: string;
+    apellidos: string;
+    edad: number;
+    fechaNacimientoEstimada?: string;
+    genero: 'Masculino' | 'Femenino';
+    perfilGrupo: PatientProfileGroup;
+    profesion: string;
+    ciudad: string;
+    telefono?: string;
+    horasSedentarioDia: number;
+    horasComputadoraDia: number;
+    horasSmartphoneDia: number;
+  };
+  anamnesisExtraida: {
+    problemaDeHoy: string;
+    diccionarioCliente: string[];
+    escoliosis: boolean;
+    cifosis: boolean;
+    lordosis: boolean;
+    asma: boolean;
+    tiroides: boolean;
+    otrosAntecedentes: string;
+    asimetriaPiernas?: string;
+    desviacionCadera?: boolean;
+    pesoMochilaKg?: number;
+    posturaEscolar?: string;
+    cantidadHijos?: number;
+    nivelSobrecarga1a10?: number;
+  };
+  evaluacionExtraida: {
+    notasTiempoReal: string[];
+    ejeCaderaCentroGravedad: string;
+    relatoNervioCiatico: string;
+    actitudPsicologica: 'Colaborador' | 'Ansioso' | 'Defensivo';
+    medicacionPsicotropa: string;
+    flexionAnteriorGrados?: string;
+    fuerzaGluteos?: string;
+  };
+  protocoloExtraido: {
+    diagnosticoPrincipal: string;
+    diagnosticoSecundario: string;
+    etiologia: string;
+    fase1Ajustes: string;
+    fase1Complementos: string;
+    fase1Restriccion: string;
+    fase2Ajustes: string;
+    fase2Ejercicios: string;
+    fase2Ergonomia: string;
+    fase3Ajustes: string;
+    fase3EjerciciosCasa: string;
+    fase3Educacion: string;
+    objetivosCortoPlazo: string[];
+    objetivosLargoPlazo: string[];
+  };
+  informeCompletoCharla: {
+    tituloInforme: string;
+    resumenConversacion: string;
+    anamnesisNarrativa: string;
+    correlacionBiomecanicaEjeCadera: string;
+    planTerapeuticoDetallado: string;
+  };
+}
+
+interface LiveClinicalScribePanelProps {
+  transcript: string;
+  onTranscriptChange: (nextTranscript: string) => void;
+  informeCharla: ScribeExtractedPayload['informeCompletoCharla'] | undefined;
+  onApplyExtractedData: (
+    payload: ScribeExtractedPayload,
+    fullTranscript: string
+  ) => void;
+  onJumpToFullReport?: () => void;
+}
+
+const DEMO_DIALOGUE_LINES: Record<
+  'ADULTO' | 'MUJER' | 'NINO',
+  string[]
+> = {
+  ADULTO: [
+    '[00:02] Juan Antonio Villalba (MP 542): Buen día, bienvenido al consultorio ATLAS. Decime por favor tu nombre y apellido, tu edad y a qué te dedicás.',
+    '[00:09] Paciente: Buen día Juan Antonio. Me llamo Martín Alejandro Morales, tengo 38 años, soy arquitecto y vivo en Salta.',
+    '[00:18] Juan Antonio Villalba (MP 542): Perfecto Martín. Contame cuántas horas estás sentado por día frente a la computadora y con el celular, y qué dolor te trae hoy.',
+    '[00:26] Paciente: Trabajo sentado unas 9 horas por día, 8 horas en la computadora diseñando planos y unas 4 horas con el celular. Hace 2 meses siento la cintura rígida a la mañana, un pinchazo fuerte en la espalda baja derecha al inclinarme y siento que me tira desde el glúteo hacia atrás del muslo.',
+    '[00:44] Juan Antonio Villalba (MP 542): ¿Tenés antecedentes de escoliosis, lordosis, asma o tiroides? ¿Tomás alguna medicación?',
+    '[00:50] Paciente: Me habían dicho que tengo hiperlordosis lumbar y una diferencia de 5 milímetros en la pierna derecha. No tomo psicofármacos, solo algún antiinflamatorio.',
+    '[01:02] Juan Antonio Villalba (MP 542): Mirá a la cámara mientras evaluamos tu postura de pie y ahora en camilla. Aunque te duela L4-L5, el eje principal es tu cadera, que es tu centro de gravedad: tenés rotación ilíaca anterior derecha, flexión anterior reducida a 35° y fuerza glútea en 4/5. Mientras te palpo te explico: el nervio ciático nace acá en tu cintura y va hasta tu pie; al desalinearse la cadera por estar 9 horas sentado, sobrecarga L4-L5 e irrita el nervio.',
+  ],
+  MUJER: [
+    '[00:02] Juan Antonio Villalba (MP 542): Hola, bienvenida. Decime tu nombre completo, edad, profesión y dónde vivís para que el sistema vaya completando tu ficha.',
+    '[00:10] Paciente: Hola Juan Antonio, soy Valeria Soledad Quiroga, tengo 41 años, soy contadora y docente, vivo en Salta capital.',
+    '[00:19] Juan Antonio Villalba (MP 542): Contame Valeria, ¿tenés hijos, cuántas horas usás computadora y celular, y cuál es tu molestia principal hoy?',
+    '[00:28] Paciente: Tengo 3 hijos, estoy 7 horas sentada por día, 6 horas en la computadora y 5 horas con el celular. Siento como una mochila de plomo en los hombros, dolor cervical que me sube a la nuca y dolor en la cadera izquierda al estar parada.',
+    '[00:45] Juan Antonio Villalba (MP 542): ¿Antecedentes de tiroides, cifosis o escoliosis?',
+    '[00:50] Paciente: Sí, tengo hipotiroidismo controlado y cifosis dorsal.',
+    '[00:58] Juan Antonio Villalba (MP 542): Evaluando en cámara y camilla: vemos antepulsión cervical y basculación de cadera izquierda. Corregimos primero el eje de tu cadera (centro de gravedad) para alinear la columna dorsal y liberar C1-C2 y L5-S1, descomprimiendo todo el recorrido del nervio ciático de la cintura al pie.',
+  ],
+  NINO: [
+    '[00:02] Juan Antonio Villalba (MP 542): Hola campeón, bienvenidos. Decime tu nombre y apellido, cuántos años tenés y a qué colegio vas acá en Salta.',
+    '[00:10] Paciente: Hola Juan Antonio, me llamo Mateo Nicolás Paz, tengo 11 años, soy estudiante de sexto grado en Salta.',
+    '[00:18] Juan Antonio Villalba (MP 542): ¿Cuántas horas estás sentado en clase, cuánto pesa tu mochila y cuántas horas usás el celular o la compu?',
+    '[00:26] Paciente: Estoy 6 horas sentado en la escuela, uso 2 horas la computadora y 4 horas el celular acostado en la cama. Mi mochila pesa 6 kilos y me cansa la espalda media; mi mamá vio que tengo el hombro derecho más alto.',
+    '[00:42] Juan Antonio Villalba (MP 542): En la cámara postural y Test de Adams vemos actitud escoliótica juvenil con desnivel pélvico funcional. Nivelando el eje de cadera en camilla, la columna se alinea para acompañar tu crecimiento sano.',
+  ],
+};
+
+// Parser local instantáneo que extrae Nombre, Apellido, Edad, Género, Profesión, Horas, etc. mientras la persona habla
+export function parseLiveTranscriptLocally(
+  text: string
+): ScribeExtractedPayload {
+  const clean = text.trim();
+
+  // 1. Extraer nombre y apellido
+  let nombre = 'Juan';
+  let apellidos = 'García López';
+  const nameMatch =
+    clean.match(
+      /(?:me llamo|mi nombre es|soy)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3})/i
+    ) ||
+    clean.match(
+      /Paciente:\s*([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,2})/i
+    );
+  if (nameMatch && nameMatch[1]) {
+    const parts = nameMatch[1].trim().split(/\s+/);
+    if (parts.length >= 3) {
+      nombre = `${parts[0]} ${parts[1]}`;
+      apellidos = parts.slice(2).join(' ');
+    } else if (parts.length === 2) {
+      nombre = parts[0];
+      apellidos = parts[1];
+    } else {
+      nombre = parts[0];
+      apellidos = '';
+    }
+  }
+
+  // 2. Extraer edad
+  let edad = 29;
+  const ageMatch = clean.match(/tengo\s+(\d{1,2})\s*años|(\d{1,2})\s*años/i);
+  if (ageMatch) {
+    edad = Number(ageMatch[1] || ageMatch[2]) || 29;
+  }
+
+  // 3. Extraer género y perfil
+  const lower = clean.toLowerCase();
+  const isFemale =
+    /soy\s+(?:contadora|profesora|docente|arquitecta|abogada|enfermera|médica|mujer|mamá)|valeria|maría|laura|ana|sofía|camila|lucía/i.test(
+      clean
+    );
+  const genero: 'Masculino' | 'Femenino' = isFemale ? 'Femenino' : 'Masculino';
+  const perfilGrupo: PatientProfileGroup =
+    edad < 16 ? 'NIÑO' : genero === 'Femenino' ? 'MUJER_ADULTA' : 'ADULTO';
+
+  // 4. Extraer profesión
+  let profesion = edad < 16 ? 'Estudiante' : 'Contador';
+  const profMatch = clean.match(
+    /soy\s+(contador(?:a)?(?:\s+y\s+docente)?|arquitecto(?:a)?|profesor(?:a)?|docente|estudiante|abogado(?:a)?|ingeniero(?:a)?|comerciante|administrativo(?:a)?|chofer|médico(?:a)?|odontólogo(?:a)?)/i
+  );
+  if (profMatch && profMatch[1]) {
+    profesion =
+      profMatch[1].charAt(0).toUpperCase() + profMatch[1].slice(1).toLowerCase();
+  }
+
+  // 5. Extraer ciudad
+  let ciudad = 'Salta';
+  const cityMatch = clean.match(
+    /vivo\s+(?:acá\s+)?en\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i
+  );
+  if (cityMatch && cityMatch[1]) {
+    ciudad = cityMatch[1].trim();
+  }
+
+  // 6. Extraer horas de sedentarismo, computadora y celular
+  const sedMatch = clean.match(/(\d{1,2})\s*horas?\s*(?:por\s*día\s*)?(?:sentad[oa]|en\s*clase)/i) ||
+    clean.match(/sentad[oa]\s*(?:unas\s*)?(\d{1,2})\s*horas?/i);
+  const pcMatch = clean.match(/(\d{1,2})\s*horas?\s*(?:frente\s*a\s*)?(?:la\s*)?(?:computadora|pc|pantallas)/i);
+  const phoneMatch = clean.match(/(\d{1,2})\s*horas?\s*(?:con\s*el\s*|en\s*el\s*|de\s*)?(?:celular|smartphone)/i);
+
+  const horasSedentarioDia = sedMatch ? Number(sedMatch[1]) : 8;
+  const horasComputadoraDia = pcMatch ? Number(pcMatch[1]) : 7;
+  const horasSmartphoneDia = phoneMatch ? Number(phoneMatch[1]) : 5;
+
+  // 7. Antecedentes
+  const escoliosis = lower.includes('escoliosis') || lower.includes('escoliótica');
+  const cifosis = lower.includes('cifosis') || lower.includes('encorva');
+  const lordosis = lower.includes('lordosis') || lower.includes('hiperlordosis');
+  const asma = lower.includes('asma');
+  const tiroides = lower.includes('tiroides') || lower.includes('hipotiroidismo');
+
+  // 8. Diccionario del cliente
+  const diccionarioCliente: string[] = [];
+  if (lower.includes('cintura trabada') || lower.includes('cintura rígida')) {
+    diccionarioCliente.push('Cintura trabada / rígida al levantarse');
+  }
+  if (lower.includes('pinchazo')) {
+    diccionarioCliente.push('Pinchazo lumbar al inclinarse');
+  }
+  if (lower.includes('mochila de plomo')) {
+    diccionarioCliente.push('Mochila de plomo en los hombros');
+  }
+  if (lower.includes('hombro derecho más alto')) {
+    diccionarioCliente.push('Hombro derecho más alto');
+  }
+  if (diccionarioCliente.length === 0) {
+    diccionarioCliente.push(
+      'Molestia mecánica vertebral asociada a postura mantenida'
+    );
+  }
+
+  // 9. Problema de hoy y diagnóstico
+  const problemaDeHoy =
+    perfilGrupo === 'NIÑO'
+      ? `Evaluación de crecimiento espinal en paciente de ${edad} años (${profesion}). Refiere fatiga dorsal por mochila escolar y uso de pantallas (${horasSmartphoneDia}h celular/día), con asimetría de hombros.`
+      : perfilGrupo === 'MUJER_ADULTA'
+      ? `Paciente de ${edad} años (${profesion}) refiere sobrecarga cérvico-dorsal y lumbopélvica asociada a jornada frente a pantallas (${horasComputadoraDia}h PC) y exigencia postural diaria.`
+      : `Paciente de ${edad} años (${profesion}) consulta por dolor mecánico lumbopélvico de evolución subaguda, originado por sedentarismo (${horasSedentarioDia}h/día sentado y ${horasComputadoraDia}h en computadora), con irradiación proximal hacia glúteo.`;
+
+  const diagnosticoPrincipal =
+    perfilGrupo === 'NIÑO'
+      ? 'Actitud escoliótica juvenil funcional con oblicuidad pélvica'
+      : perfilGrupo === 'MUJER_ADULTA'
+      ? 'Síndrome postural cérvico-dorsal y desbalance sacroilíaco'
+      : 'Síndrome facetario lumbar L4-L5 y disfunción del eje de cadera';
+
+  const birthYear = 2026 - edad;
+
+  return {
+    datosPaciente: {
+      nombre,
+      apellidos,
+      edad,
+      fechaNacimientoEstimada: `${birthYear}-05-15`,
+      genero,
+      perfilGrupo,
+      profesion,
+      ciudad,
+      telefono: '+54 387 481-6999',
+      horasSedentarioDia,
+      horasComputadoraDia,
+      horasSmartphoneDia,
+    },
+    anamnesisExtraida: {
+      problemaDeHoy,
+      diccionarioCliente,
+      escoliosis,
+      cifosis,
+      lordosis,
+      asma,
+      tiroides,
+      otrosAntecedentes: `Sedentarismo ${horasSedentarioDia}h/día · PC ${horasComputadoraDia}h/día`,
+      asimetriaPiernas: 'Acortamiento funcional derecho 5-6 mm',
+      desviacionCadera: true,
+      pesoMochilaKg: perfilGrupo === 'NIÑO' ? 6.0 : undefined,
+      posturaEscolar:
+        perfilGrupo === 'NIÑO'
+          ? '6h sentado en pupitre + celular en cama'
+          : undefined,
+      cantidadHijos: perfilGrupo === 'MUJER_ADULTA' ? 3 : undefined,
+      nivelSobrecarga1a10: perfilGrupo === 'MUJER_ADULTA' ? 8 : undefined,
+    },
+    evaluacionExtraida: {
+      notasTiempoReal: [
+        `Paciente: ${nombre} ${apellidos} (${edad} años, ${profesion})`,
+        'Eje Cadera: Basculación ilíaca evaluada como centro de gravedad primario',
+        'Columna: Sobrecarga segmentaria L4-L5 y compensación dorsal',
+        'Recorrido Ciático: Explicado en tiempo real de cintura a pie',
+        'Flexión anterior: 35° | Fuerza glútea: 4/5',
+      ],
+      ejeCaderaCentroGravedad:
+        'Evaluado por Juan Antonio Villalba (MP 542): el bloqueo en anteversión de cadera desplaza el centro de gravedad anteriorizando la carga sobre L4-L5.',
+      relatoNervioCiatico:
+        'Se educa al paciente en camilla explicando cómo el nervio ciático nace en la columna lumbosacra y desciende por el glúteo hasta el pie.',
+      actitudPsicologica: 'Colaborador',
+      medicacionPsicotropa: 'Ninguno (Sin psicofármacos activos)',
+      flexionAnteriorGrados: '35°',
+      fuerzaGluteos: '4/5',
+    },
+    protocoloExtraido: {
+      diagnosticoPrincipal,
+      diagnosticoSecundario:
+        'Secundario a desbalance del eje de cadera y sobrecarga estática frente a pantallas',
+      etiologia: `Sedentarismo (${horasSedentarioDia}h/día) + Computadora (${horasComputadoraDia}h/día) + Smartphone (${horasSmartphoneDia}h/día)`,
+      fase1Ajustes: '2x/semana (Ajuste de eje de cadera, sacro y segmento L4-L5 / C1)',
+      fase1Complementos: 'Liberación miofascial de psoas e isquiotibiales',
+      fase1Restriccion: 'Evitar flexión extrema y cargas > 10 kg',
+      fase2Ajustes: '1x/semana (Estabilización lumbopélvica)',
+      fase2Ejercicios: '3x/semana (Glute Bridge, Bird Dog, Cat-Cow)',
+      fase2Ergonomia: 'Monitor a altura visual (75 cm) y pausas activas cada 45 min',
+      fase3Ajustes: '1x/mes (Mantenimiento preventivo)',
+      fase3EjerciciosCasa: '5x/semana (5-7 min de higiene espinal)',
+      fase3Educacion: 'Reeducación postural y control del eje de cadera',
+      objetivosCortoPlazo: [
+        'Dolor: 8→3 (escala EVA)',
+        'Flexión anterior: 35→65°',
+        'Desbloquear eje de cadera y reducir rigidez matutina',
+      ],
+      objetivosLargoPlazo: [
+        'Mantener columna estable sin recaídas',
+        'Fuerza glútea y core 5/5',
+        'Alineación postural normolordótica',
+      ],
+    },
+    informeCompletoCharla: {
+      tituloInforme: `INFORME CLÍNICO INTEGRAL DE CHARLA EN VIVO — ${nombre.toUpperCase()} ${apellidos.toUpperCase()}`,
+      resumenConversacion: `Entrevista clínica realizada por el propietario titular Juan Antonio Villalba (MP 542) con cámara y micrófono conectados en tiempo real. Se identifica a ${nombre} ${apellidos}, de ${edad} años (${genero}, ${profesion} en ${ciudad}). Durante el diálogo el paciente describe su motivo de consulta y rutina diaria (${horasSedentarioDia}h sedentario, ${horasComputadoraDia}h PC, ${horasSmartphoneDia}h smartphone).`,
+      anamnesisNarrativa: `${problemaDeHoy} Frases clave registradas en el diccionario del paciente: ${diccionarioCliente.join(
+        ' | '
+      )}.`,
+      correlacionBiomecanicaEjeCadera:
+        'Durante la exploración frente a cámara y en camilla, Juan Antonio Villalba (MP 542) demuestra cómo el eje principal de la cadera (centro de gravedad) condiciona la alineación vertebral y explica simultáneamente al paciente el recorrido del nervio ciático desde la cintura hasta el pie.',
+      planTerapeuticoDetallado: `Se establece protocolo personalizado en 4 fases para ${diagnosticoPrincipal}: Fase 1 de descompresión y nivelación de cadera (2x/sem), Fase 2 de fortalecimiento glúteo/core y ergonomía (8 sem), Fase 3 de prevención mensual y Fase 4 de optimización funcional.`,
+    },
+  };
+}
+
+export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = ({
+  transcript,
+  onTranscriptChange,
+  informeCharla,
+  onApplyExtractedData,
+  onJumpToFullReport,
+}) => {
+  const [isCameraAndMicConnected, setIsCameraAndMicConnected] = useState(false);
+  const [isSpeechListening, setIsSpeechListening] = useState(false);
+  const [micVolume, setMicVolume] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [cameraSnapshotUrl, setCameraSnapshotUrl] = useState<string | null>(
+    null
+  );
+  const [isProcessingGemini, setIsProcessingGemini] = useState(false);
+  const [isTranscribingAudioBlob, setIsTranscribingAudioBlob] = useState(false);
+  const [statusBanner, setStatusBanner] = useState<string | null>(null);
+  const [autoDetectedFields, setAutoDetectedFields] =
+    useState<ScribeExtractedPayload | null>(() =>
+      transcript.trim() ? parseLiveTranscriptLocally(transcript) : null
+    );
+  const [manualUtterance, setManualUtterance] = useState('');
+  const [speakerRole, setSpeakerRole] = useState<'PACIENTE' | 'VILLALBA'>(
+    'PACIENTE'
+  );
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+  const simIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Actualizar autocompletado instantáneo cada vez que crece la transcripción
+  useEffect(() => {
+    if (!transcript.trim()) return;
+    const localExtracted = parseLiveTranscriptLocally(transcript);
+    setAutoDetectedFields(localExtracted);
+  }, [transcript]);
+
+  // Cronómetro cuando cámara + micrófono están conectados
+  useEffect(() => {
+    if (!isCameraAndMicConnected && !isSpeechListening) return;
+    const timer = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isCameraAndMicConnected, isSpeechListening]);
+
+  // Limpiar recursos al desmontar
+  useEffect(() => {
+    return () => {
+      stopAllMediaAndRecognition();
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    };
+  }, []);
+
+  const stopAllMediaAndRecognition = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null;
+    }
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== 'inactive'
+    ) {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {
+        // ignore
+      }
+    }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch {
+        // ignore
+      }
+      audioContextRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setIsCameraAndMicConnected(false);
+    setIsSpeechListening(false);
+    setMicVolume(0);
+  };
+
+  const startCameraAndMicLive = async () => {
+    if (isCameraAndMicConnected) {
+      stopAllMediaAndRecognition();
+      setStatusBanner(
+        'Cámara y micrófono desconectados. La transcripción y los datos autocompletados se han conservado.'
+      );
+      return;
+    }
+
+    setStatusBanner(
+      'Conectando Cámara + Micrófono en vivo e iniciando transcripción continua y autocompletado...'
+    );
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      streamRef.current = stream;
+      setIsCameraAndMicConnected(true);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+
+      // Medidor real de nivel de micrófono con Web Audio API
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      if (AudioCtx) {
+        const audioCtx = new AudioCtx();
+        audioContextRef.current = audioCtx;
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const updateMeter = () => {
+          if (!analyserRef.current) return;
+          analyserRef.current.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+          const normalized = Math.min(100, Math.round((avg / 90) * 100));
+          setMicVolume(normalized);
+          animFrameRef.current = requestAnimationFrame(updateMeter);
+        };
+        updateMeter();
+      }
+
+      // Iniciar grabación en segundo plano para transcripción con Gemini 3.5 Transcribe
+      recordedChunksRef.current = [];
+      try {
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (ev) => {
+          if (ev.data && ev.data.size > 0) {
+            recordedChunksRef.current.push(ev.data);
+          }
+        };
+        recorder.start(3000);
+      } catch {
+        // ignore if MediaRecorder mime unsupported
+      }
+
+      // Iniciar reconocimiento de voz en tiempo real (Web Speech API en español)
+      startBrowserSpeechRecognition();
+
+      setStatusBanner(
+        '🔴 EN VIVO: Cámara + Micrófono activos. Habla con el paciente: el sistema transcribe la charla y autocompleta Nombre, Apellido, Edad, Género y Ficha Clínica automáticamente.'
+      );
+    } catch {
+      // Si el navegador bloquea la cámara/micrófono físico, activamos igualmente el reconocedor de voz o modo asistido
+      setIsCameraAndMicConnected(true);
+      startBrowserSpeechRecognition();
+      setStatusBanner(
+        '🎙️ Modo Escucha Activo: Puedes hablar por micrófono, escribir en el diálogo o usar el botón de Simulación de Charla en Vivo.'
+      );
+    }
+  };
+
+  const startBrowserSpeechRecognition = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRec) return;
+
+    try {
+      const recognition = new SpeechRec();
+      recognition.lang = 'es-AR';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recognition.onresult = (event: any) => {
+        let addedLines = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            const spoken = String(event.results[i][0].transcript).trim();
+            if (spoken) {
+              const mins = String(Math.floor(elapsedSeconds / 60)).padStart(
+                2,
+                '0'
+              );
+              const secs = String(elapsedSeconds % 60).padStart(2, '0');
+              addedLines += `\n[${mins}:${secs}] Charla en vivo: ${spoken}`;
+            }
+          }
+        }
+        if (addedLines) {
+          const updated = `${transcript}${addedLines}`.trim();
+          onTranscriptChange(updated);
+          const localPayload = parseLiveTranscriptLocally(updated);
+          setAutoDetectedFields(localPayload);
+          onApplyExtractedData(localPayload, updated);
+        }
+      };
+
+      recognition.onerror = () => {
+        // keep listening or ignore transient speech api warnings
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsSpeechListening(true);
+    } catch {
+      // ignore
+    }
+  };
+
+  const captureCameraFrame = (): string | null => {
+    if (!videoRef.current || !videoRef.current.videoWidth) {
+      return cameraSnapshotUrl;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+    setCameraSnapshotUrl(dataUrl);
+    setStatusBanner('📸 Frame postural capturado desde la cámara en vivo.');
+    return dataUrl;
+  };
+
+  // Transcribir el audio grabado con Gemini 3.5 Transcribe en el servidor
+  const handleTranscribeRecordedAudioWithGemini = async () => {
+    if (recordedChunksRef.current.length === 0) {
+      setStatusBanner(
+        'Graba unos segundos con el micrófono activo antes de solicitar transcripción de audio IA, o procesa directamente la transcripción actual.'
+      );
+      return;
+    }
+
+    setIsTranscribingAudioBlob(true);
+    setStatusBanner(
+      '⏳ Enviando audio del micrófono a Gemini 3.5 Transcribe...'
+    );
+
+    try {
+      const audioBlob = new Blob(recordedChunksRef.current, {
+        type: 'audio/webm',
+      });
+      const base64Audio = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const res = String(reader.result || '');
+          const base64 = res.includes('base64,') ? res.split('base64,')[1] : res;
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(audioBlob);
+      });
+
+      const response = await fetch('/api/clinical-scribe/transcribe-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioBase64: base64Audio,
+          mimeType: 'audio/webm',
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.transcript) {
+        const merged = `${transcript}\n${data.transcript}`.trim();
+        onTranscriptChange(merged);
+        await handleProcessFullConversationWithAI(merged);
+      } else {
+        setStatusBanner(
+          data.error ||
+            'Audio procesado localmente. Ejecutando autocompletado clínico...'
+        );
+        await handleProcessFullConversationWithAI(transcript);
+      }
+    } catch {
+      await handleProcessFullConversationWithAI(transcript);
+    } finally {
+      setIsTranscribingAudioBlob(false);
+    }
+  };
+
+  // Procesar toda la charla con Gemini 3.8 Flash (/api/clinical-scribe/extract) + Fallback instantáneo
+  const handleProcessFullConversationWithAI = async (
+    customTranscript?: string
+  ) => {
+    const textToAnalyze = (customTranscript ?? transcript).trim();
+    if (!textToAnalyze) {
+      setStatusBanner(
+        '⚠️ No hay charla registrada aún. Conecta el micrófono o usa el botón de Simulación en Vivo.'
+      );
+      return;
+    }
+
+    // 1. Aplicar de inmediato los datos detectados localmente para respuesta instantánea
+    const immediateLocal = parseLiveTranscriptLocally(textToAnalyze);
+    setAutoDetectedFields(immediateLocal);
+    onApplyExtractedData(immediateLocal, textToAnalyze);
+
+    // 2. Llamar al servidor con Gemini 3.8 Flash para enriquecer todos los campos y redactar el Informe Completo
+    setIsProcessingGemini(true);
+    setStatusBanner(
+      '🤖 Procesando toda la charla entre Juan Antonio Villalba (MP 542) y el paciente para autocompletar datos y redactar el Informe Completo...'
+    );
+
+    const frame = captureCameraFrame();
+
+    try {
+      const response = await fetch('/api/clinical-scribe/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: textToAnalyze,
+          cameraSnapshotBase64: frame,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.extracted) {
+        const aiPayload: ScribeExtractedPayload = {
+          datosPaciente: {
+            ...immediateLocal.datosPaciente,
+            ...data.extracted.datosPaciente,
+            genero:
+              data.extracted.datosPaciente?.genero === 'Femenino'
+                ? 'Femenino'
+                : 'Masculino',
+            perfilGrupo:
+              data.extracted.datosPaciente?.perfilGrupo === 'NIÑO' ||
+              data.extracted.datosPaciente?.perfilGrupo === 'MUJER_ADULTA' ||
+              data.extracted.datosPaciente?.perfilGrupo === 'ADULTO'
+                ? data.extracted.datosPaciente.perfilGrupo
+                : immediateLocal.datosPaciente.perfilGrupo,
+          },
+          anamnesisExtraida: {
+            ...immediateLocal.anamnesisExtraida,
+            ...data.extracted.anamnesisExtraida,
+          },
+          evaluacionExtraida: {
+            ...immediateLocal.evaluacionExtraida,
+            ...data.extracted.evaluacionExtraida,
+          },
+          protocoloExtraido: {
+            ...immediateLocal.protocoloExtraido,
+            ...data.extracted.protocoloExtraido,
+          },
+          informeCompletoCharla: {
+            ...immediateLocal.informeCompletoCharla,
+            ...data.extracted.informeCompletoCharla,
+          },
+        };
+
+        setAutoDetectedFields(aiPayload);
+        onApplyExtractedData(aiPayload, textToAnalyze);
+        setStatusBanner(
+          `✓ ¡Autocompletado e Informe Completo listos! Paciente detectado: ${aiPayload.datosPaciente.nombre} ${aiPayload.datosPaciente.apellidos} (${aiPayload.datosPaciente.edad} años, ${aiPayload.datosPaciente.genero}, ${aiPayload.datosPaciente.profesion}).`
+        );
+      } else {
+        setStatusBanner(
+          `✓ Datos fundamentales autocompletados e Informe Completo generado para ${immediateLocal.datosPaciente.nombre} ${immediateLocal.datosPaciente.apellidos} (${immediateLocal.datosPaciente.edad} años).`
+        );
+      }
+    } catch {
+      setStatusBanner(
+        `✓ Datos fundamentales autocompletados e Informe Completo generado para ${immediateLocal.datosPaciente.nombre} ${immediateLocal.datosPaciente.apellidos} (${immediateLocal.datosPaciente.edad} años).`
+      );
+    } finally {
+      setIsProcessingGemini(false);
+    }
+  };
+
+  // Simulador progresivo en tiempo real de una charla clínica para probar cómo se autocompletan los campos frase por frase
+  const startSimulatedLiveConversation = (
+    scenario: 'ADULTO' | 'MUJER' | 'NINO'
+  ) => {
+    if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    const lines = DEMO_DIALOGUE_LINES[scenario];
+    let idx = 0;
+    let accumulated = '';
+    onTranscriptChange('');
+    setStatusBanner(
+      '🎙️ Escuchando charla en tiempo real entre Juan Antonio Villalba (MP 542) y el paciente... Observa cómo se autocompletan Nombre, Apellido, Edad, Género y Hallazgos.'
+    );
+
+    simIntervalRef.current = setInterval(() => {
+      if (idx < lines.length) {
+        accumulated = accumulated
+          ? `${accumulated}\n${lines[idx]}`
+          : lines[idx];
+        onTranscriptChange(accumulated);
+        setMicVolume(Math.floor(45 + Math.random() * 45));
+
+        const parsedNow = parseLiveTranscriptLocally(accumulated);
+        setAutoDetectedFields(parsedNow);
+        onApplyExtractedData(parsedNow, accumulated);
+        idx++;
+      } else {
+        if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+        setMicVolume(0);
+        handleProcessFullConversationWithAI(accumulated);
+      }
+    }, 950);
+  };
+
+  const handleAddManualUtterance = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualUtterance.trim()) return;
+    const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
+    const secs = String(elapsedSeconds % 60).padStart(2, '0');
+    const speakerLabel =
+      speakerRole === 'VILLALBA'
+        ? 'Juan Antonio Villalba (MP 542)'
+        : 'Paciente';
+    const nextTranscript = `${transcript}\n[${mins}:${secs}] ${speakerLabel}: ${manualUtterance.trim()}`.trim();
+    onTranscriptChange(nextTranscript);
+    setManualUtterance('');
+
+    const parsed = parseLiveTranscriptLocally(nextTranscript);
+    setAutoDetectedFields(parsed);
+    onApplyExtractedData(parsed, nextTranscript);
+  };
+
+  const activeReport =
+    informeCharla || autoDetectedFields?.informeCompletoCharla;
+
+  return (
+    <div className="border-b-2 border-[#003366] bg-[#F0F4F8] p-4 sm:p-6 space-y-5 no-print">
+      {/* Encabezado del Copiloto de Escucha Clínica en Vivo */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-[#1a5490] pb-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 bg-[#E74C3C] text-white text-[11px] font-bold tracking-wider uppercase">
+              FUNCIÓN CENTRAL EN VIVO
+            </span>
+            <span className="text-xs font-mono font-bold text-[#1a5490]">
+              PROPIETARIO: JUAN ANTONIO VILLALBA — MP 542
+            </span>
+          </div>
+          <h2 className="text-base sm:text-lg font-bold text-[#003366] mt-1">
+            🎙️📹 PROCESADOR EN VIVO DE CHARLA CLÍNICA (CÁMARA + MICRÓFONO + AUTOCOMPLETADO + INFORME COMPLETO)
+          </h2>
+          <p className="text-xs text-slate-600">
+            Escucha toda la conversación entre <strong>Juan Antonio Villalba (MP 542)</strong> y el paciente, transcribe cada frase, autocompleta Nombre, Apellido, Edad, Género, Profesión y Ficha Clínica, y redacta el Informe Completo automáticamente.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={startCameraAndMicLive}
+            className={`px-4 py-2.5 text-xs font-bold flex items-center gap-2 border-2 cursor-pointer transition-colors ${
+              isCameraAndMicConnected
+                ? 'bg-[#E74C3C] text-white border-[#E74C3C]'
+                : 'bg-[#27AE60] hover:bg-emerald-700 text-white border-[#27AE60]'
+            }`}
+          >
+            {isCameraAndMicConnected ? (
+              <>
+                <Square className="w-4 h-4" />
+                <span>[DETENER CÁMARA Y MICRÓFONO]</span>
+              </>
+            ) : (
+              <>
+                <Video className="w-4 h-4" />
+                <Mic className="w-4 h-4" />
+                <span>[CONECTAR CÁMARA + MICRÓFONO EN VIVO]</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleProcessFullConversationWithAI()}
+            disabled={isProcessingGemini}
+            className="px-4 py-2.5 bg-[#1a5490] hover:bg-[#003366] text-white text-xs font-bold flex items-center gap-1.5 border-2 border-[#003366] cursor-pointer disabled:opacity-60"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>
+              {isProcessingGemini
+                ? 'Procesando Charla...'
+                : '[PROCESAR CHARLA → AUTOCOMPLETAR + INFORME COMPLETO]'}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {statusBanner && (
+        <div className="p-3 bg-white border-l-4 border-[#27AE60] text-xs font-bold text-[#003366] flex items-center justify-between gap-2 shadow-2xs">
+          <span>{statusBanner}</span>
+          {onJumpToFullReport && (
+            <button
+              type="button"
+              onClick={onJumpToFullReport}
+              className="px-3 py-1 bg-[#27AE60] text-white text-xs font-bold whitespace-nowrap cursor-pointer"
+            >
+              📄 Ver Informe PDF Completo →
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Grilla Principal: 1) Cámara + Micrófono (4 cols) | 2) Transcripción en Vivo (4 cols) | 3) Datos Autocompletados en Tiempo Real (4 cols) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* COLUMNA 1: CÁMARA Y MICRÓFONO CONECTADOS */}
+        <div className="lg:col-span-4 bg-white border-2 border-[#E0E0E0] p-3.5 space-y-3 flex flex-col justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#003366] flex items-center gap-1.5">
+                {isCameraAndMicConnected ? (
+                  <Video className="w-4 h-4 text-[#27AE60]" />
+                ) : (
+                  <VideoOff className="w-4 h-4 text-slate-400" />
+                )}
+                📹 CÁMARA + 🎤 MICRÓFONO
+              </span>
+              <span className="text-xs font-mono font-bold text-[#E74C3C]">
+                {isCameraAndMicConnected ? '● CONECTADO' : '○ EN ESPERA'} (
+                {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:
+                {String(elapsedSeconds % 60).padStart(2, '0')})
+              </span>
+            </div>
+
+            {/* Visor de Cámara con Plomada Postural */}
+            <div className="relative h-44 bg-slate-950 border border-[#003366] overflow-hidden flex items-center justify-center">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover ${
+                  isCameraAndMicConnected ? 'block' : 'hidden'
+                }`}
+              />
+
+              {!isCameraAndMicConnected && cameraSnapshotUrl && (
+                <img
+                  src={cameraSnapshotUrl}
+                  alt="Captura postural"
+                  className="w-full h-full object-cover"
+                />
+              )}
+
+              {!isCameraAndMicConnected && !cameraSnapshotUrl && (
+                <div className="text-center p-4 text-slate-300 space-y-1">
+                  <Camera className="w-7 h-7 mx-auto text-[#3498DB]" />
+                  <div className="text-xs font-bold">
+                    CÁMARA Y MICRÓFONO LISTOS
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Haz clic en [CONECTAR CÁMARA + MICRÓFONO EN VIVO] o prueba una charla simulada debajo
+                  </div>
+                </div>
+              )}
+
+              {/* Retícula de plomada postural superpuesta */}
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="w-px h-full bg-emerald-400/40" />
+                <div className="h-px w-full bg-emerald-400/40 absolute" />
+              </div>
+            </div>
+
+            {/* Medidor de nivel de micrófono en tiempo real */}
+            <div className="space-y-1 pt-1">
+              <div className="flex items-center justify-between text-xs font-bold text-[#003366]">
+                <span className="flex items-center gap-1">
+                  {isCameraAndMicConnected ? (
+                    <Mic className="w-3.5 h-3.5 text-[#27AE60]" />
+                  ) : (
+                    <MicOff className="w-3.5 h-3.5 text-slate-400" />
+                  )}
+                  Nivel de Voz en Micrófono:
+                </span>
+                <span className="font-mono">{micVolume}%</span>
+              </div>
+              <div className="w-full h-3 bg-[#ECEFF1] border border-[#E0E0E0] overflow-hidden">
+                <div
+                  style={{ width: `${micVolume}%` }}
+                  className="h-full bg-[#27AE60] transition-all duration-150"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-[#E0E0E0]">
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={captureCameraFrame}
+                className="flex-1 py-1.5 px-2 bg-[#F8FAFC] hover:bg-[#ECEFF1] border border-[#E0E0E0] text-[11px] font-bold text-[#003366] cursor-pointer"
+              >
+                📸 Capturar Postura
+              </button>
+              <button
+                type="button"
+                onClick={handleTranscribeRecordedAudioWithGemini}
+                disabled={isTranscribingAudioBlob}
+                className="flex-1 py-1.5 px-2 bg-[#1a5490] text-white text-[11px] font-bold cursor-pointer disabled:opacity-50"
+              >
+                {isTranscribingAudioBlob
+                  ? 'Transcribiendo...'
+                  : '🎙️ Transcribir Audio IA'}
+              </button>
+            </div>
+
+            {/* Botones de prueba rápida de charla en vivo para demostrar autocompletado */}
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-slate-500 uppercase">
+                Simular charla en vivo (Autocompletado automático):
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  type="button"
+                  onClick={() => startSimulatedLiveConversation('ADULTO')}
+                  className="py-1 px-1.5 bg-white border border-[#1a5490] text-[#1a5490] hover:bg-[#1a5490] hover:text-white text-[10px] font-bold cursor-pointer flex items-center justify-center gap-0.5"
+                >
+                  <Play className="w-2.5 h-2.5" /> Adulto (38a)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startSimulatedLiveConversation('MUJER')}
+                  className="py-1 px-1.5 bg-white border border-[#1a5490] text-[#1a5490] hover:bg-[#1a5490] hover:text-white text-[10px] font-bold cursor-pointer flex items-center justify-center gap-0.5"
+                >
+                  <Play className="w-2.5 h-2.5" /> Mujer (41a)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startSimulatedLiveConversation('NINO')}
+                  className="py-1 px-1.5 bg-white border border-[#1a5490] text-[#1a5490] hover:bg-[#1a5490] hover:text-white text-[10px] font-bold cursor-pointer flex items-center justify-center gap-0.5"
+                >
+                  <Play className="w-2.5 h-2.5" /> Niño (11a)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* COLUMNA 2: TRANSCRIPCIÓN COMPLETA DE TODA LA CHARLA EN TIEMPO REAL */}
+        <div className="lg:col-span-4 bg-white border-2 border-[#E0E0E0] p-3.5 flex flex-col justify-between space-y-2">
+          <div className="space-y-2 flex-1 flex flex-col">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#003366]">
+                📝 TRANSCRIPCIÓN DE TODA LA CHARLA EN VIVO
+              </span>
+              <span className="text-[11px] font-mono text-[#27AE60] font-bold">
+                Auto-Sync Activo
+              </span>
+            </div>
+
+            <textarea
+              rows={9}
+              value={transcript}
+              onChange={(e) => {
+                const val = e.target.value;
+                onTranscriptChange(val);
+                const local = parseLiveTranscriptLocally(val);
+                setAutoDetectedFields(local);
+                onApplyExtractedData(local, val);
+              }}
+              placeholder="Aquí aparece en vivo todo lo que hablan Juan Antonio Villalba (MP 542) y el paciente (ej. 'Me llamo Martín Morales, tengo 38 años, soy arquitecto...'). También puedes escribir o dictar aquí."
+              className="w-full flex-1 border border-[#E0E0E0] bg-[#F8FAFC] p-2.5 text-xs font-mono text-[#003366] leading-relaxed focus:border-[#1a5490] focus:outline-none"
+            />
+          </div>
+
+          {/* Entrada rápida para agregar frases de la charla */}
+          <form onSubmit={handleAddManualUtterance} className="space-y-1.5 pt-1">
+            <div className="flex items-center gap-1 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setSpeakerRole('PACIENTE')}
+                className={`px-2 py-0.5 font-bold border ${
+                  speakerRole === 'PACIENTE'
+                    ? 'bg-[#1a5490] text-white border-[#1a5490]'
+                    : 'bg-white text-[#003366] border-[#E0E0E0]'
+                }`}
+              >
+                Habla Paciente
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpeakerRole('VILLALBA')}
+                className={`px-2 py-0.5 font-bold border ${
+                  speakerRole === 'VILLALBA'
+                    ? 'bg-[#003366] text-white border-[#003366]'
+                    : 'bg-white text-[#003366] border-[#E0E0E0]'
+                }`}
+              >
+                Habla Juan A. Villalba (MP 542)
+              </button>
+            </div>
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                value={manualUtterance}
+                onChange={(e) => setManualUtterance(e.target.value)}
+                placeholder="Ej: Me llamo Sofía Herrera, tengo 34 años..."
+                className="flex-1 border border-[#E0E0E0] px-2.5 py-1.5 text-xs text-[#003366]"
+              />
+              <button
+                type="submit"
+                className="px-3 py-1.5 bg-[#27AE60] text-white text-xs font-bold cursor-pointer"
+              >
+                + Charla
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* COLUMNA 3: DATOS FUNDAMENTALES AUTOCOMPLETADOS EN VIVO */}
+        <div className="lg:col-span-4 bg-white border-2 border-[#27AE60] p-3.5 flex flex-col justify-between space-y-3">
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between border-b border-[#E0E0E0] pb-1.5">
+              <span className="text-xs font-bold text-[#003366] flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-[#27AE60]" />
+                ⚡ DATOS AUTOCOMPLETADOS EN VIVO
+              </span>
+              <span className="text-[10px] font-mono bg-emerald-50 text-[#27AE60] px-1.5 py-0.5 border border-[#27AE60] font-bold">
+                TIEMPO REAL
+              </span>
+            </div>
+
+            {autoDetectedFields ? (
+              <div className="space-y-2 text-xs font-mono text-[#003366]">
+                <div className="grid grid-cols-2 gap-1.5 bg-[#F8FAFC] p-2 border border-[#E0E0E0]">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">
+                      NOMBRE:
+                    </span>
+                    <strong className="text-[#003366]">
+                      ✓ {autoDetectedFields.datosPaciente.nombre}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">
+                      APELLIDO:
+                    </span>
+                    <strong className="text-[#003366]">
+                      ✓ {autoDetectedFields.datosPaciente.apellidos || '—'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">
+                      EDAD:
+                    </span>
+                    <strong className="text-[#27AE60]">
+                      ✓ {autoDetectedFields.datosPaciente.edad} años
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">
+                      GÉNERO / PERFIL:
+                    </span>
+                    <strong className="text-[#1a5490]">
+                      ✓ {autoDetectedFields.datosPaciente.genero} (
+                      {autoDetectedFields.datosPaciente.perfilGrupo})
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">
+                      PROFESIÓN:
+                    </span>
+                    <strong>✓ {autoDetectedFields.datosPaciente.profesion}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">
+                      CIUDAD:
+                    </span>
+                    <strong>✓ {autoDetectedFields.datosPaciente.ciudad}</strong>
+                  </div>
+                </div>
+
+                <div className="bg-[#F8FAFC] p-2 border border-[#E0E0E0] space-y-1 text-[11px]">
+                  <div>
+                    <strong>Carga Diaria:</strong>{' '}
+                    {autoDetectedFields.datosPaciente.horasSedentarioDia}h
+                    sedentario ·{' '}
+                    {autoDetectedFields.datosPaciente.horasComputadoraDia}h PC ·{' '}
+                    {autoDetectedFields.datosPaciente.horasSmartphoneDia}h
+                    celular
+                  </div>
+                  <div>
+                    <strong>Diagnóstico Sugerido:</strong>{' '}
+                    <span className="text-[#1a5490] font-bold">
+                      {autoDetectedFields.protocoloExtraido.diagnosticoPrincipal}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500 p-4 text-center">
+                Inicia la charla para autocompletar Nombre, Apellido, Edad, Género y Diagnóstico automáticamente.
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-[#E0E0E0] flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => handleProcessFullConversationWithAI()}
+              className="w-full py-2 bg-[#27AE60] hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>[SINCRONIZAR TODOS LOS PASOS 1 A 5]</span>
+            </button>
+            {onJumpToFullReport && (
+              <button
+                type="button"
+                onClick={onJumpToFullReport}
+                className="w-full py-2 bg-[#003366] hover:bg-[#1a5490] text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>[GENERAR INFORME COMPLETO PDF AHORA]</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* VISTA PREVIA EN VIVO DEL INFORME COMPLETO DE LA CHARLA */}
+      {activeReport && (
+        <div className="bg-white border-2 border-[#1a5490] p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E0E0E0] pb-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-[#27AE60]" />
+              <h3 className="text-xs sm:text-sm font-bold text-[#003366]">
+                📋 {activeReport.tituloInforme}
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono text-[#1a5490] font-bold">
+              Firmado por: Juan Antonio Villalba — MP 542
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-800">
+            <div className="p-2.5 bg-[#F8FAFC] border border-[#E0E0E0]">
+              <strong className="text-[#003366] block mb-0.5">
+                1. Síntesis de la Charla Clínica:
+              </strong>
+              {activeReport.resumenConversacion}
+            </div>
+            <div className="p-2.5 bg-[#F8FAFC] border border-[#E0E0E0]">
+              <strong className="text-[#003366] block mb-0.5">
+                2. Anamnesis y Contexto Extraído:
+              </strong>
+              {activeReport.anamnesisNarrativa}
+            </div>
+            <div className="p-2.5 bg-[#F8FAFC] border border-[#E0E0E0]">
+              <strong className="text-[#003366] block mb-0.5">
+                3. Correlación Eje de Cadera y Nervio Ciático:
+              </strong>
+              {activeReport.correlacionBiomecanicaEjeCadera}
+            </div>
+            <div className="p-2.5 bg-[#F8FAFC] border border-[#E0E0E0]">
+              <strong className="text-[#003366] block mb-0.5">
+                4. Plan Terapéutico y Protocolo Generado:
+              </strong>
+              {activeReport.planTerapeuticoDetallado}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

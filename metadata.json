@@ -1,0 +1,6 @@
+{
+  "name": "ATLAS Columna Vertebral — Sistema Clínico Quiropráctico",
+  "description": "Sistema profesional de evaluación clínica quiropráctica funcional, anamnesis estructurada, correlación de imágenes (RX/RMN/DICOM), diagnóstico diferencial y protocolos terapéuticos personalizados.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
