@@ -318,6 +318,13 @@ export default function App() {
 
       {/* CONTENIDO PRINCIPAL SEGÚN PANTALLA ACTIVA */}
       <main className="flex-1 p-4 sm:p-6">
+        <div
+          role="note"
+          className="no-print mx-auto mb-4 max-w-5xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+        >
+          <strong>Prototipo local:</strong> los datos se guardan en este navegador sin cifrado ni control de acceso.
+          Usá solo datos ficticios; no cargues información real de pacientes.
+        </div>
         {/* ===================================================================
             PANTALLA 2: DASHBOARD PRINCIPAL (Médico) - WIREFRAME EXACTO
            =================================================================== */}

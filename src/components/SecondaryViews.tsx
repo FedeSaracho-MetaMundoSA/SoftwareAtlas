@@ -43,11 +43,15 @@ export const PatientsDirectoryView: React.FC<PatientsDirectoryViewProps> = ({
 
   const [formNombre, setFormNombre] = useState('');
   const [formEdad, setFormEdad] = useState(30);
-  const [formGenero, setFormGenero] = useState<'Masculino' | 'Femenino'>(
-    'Masculino'
+  const [formGenero, setFormGenero] = useState<
+    'Masculino' | 'Femenino' | 'No especificado'
+  >(
+    'No especificado'
   );
   const [formProfesion, setFormProfesion] = useState('');
   const [formCiudad, setFormCiudad] = useState('Salta');
+  const [formTelefono, setFormTelefono] = useState('');
+  const [formEmail, setFormEmail] = useState('');
   const [formEstado, setFormEstado] = useState<PatientStatus>('Mejorando');
   const [formProximaCita, setFormProximaCita] = useState('Oct 17');
 
@@ -58,6 +62,8 @@ export const PatientsDirectoryView: React.FC<PatientsDirectoryViewProps> = ({
     setFormGenero('Masculino');
     setFormProfesion('');
     setFormCiudad('Salta');
+    setFormTelefono('');
+    setFormEmail('');
     setFormEstado('Evaluación Inicial');
     setFormProximaCita('Oct 24');
     setIsCreating(true);
@@ -70,6 +76,8 @@ export const PatientsDirectoryView: React.FC<PatientsDirectoryViewProps> = ({
     setFormGenero(pat.genero);
     setFormProfesion(pat.profesion);
     setFormCiudad(pat.ciudad);
+    setFormTelefono(pat.telefono);
+    setFormEmail(pat.email);
     setFormEstado(pat.estado);
     setFormProximaCita(pat.proximaCita);
     setIsCreating(true);
@@ -87,8 +95,8 @@ export const PatientsDirectoryView: React.FC<PatientsDirectoryViewProps> = ({
       genero: formGenero,
       profesion: formProfesion.trim() || 'Particular',
       ciudad: formCiudad.trim() || 'Salta',
-      telefono: editingPatient?.telefono || '+54 387 481-6999',
-      email: editingPatient?.email || 'paciente@quiropraxia.com',
+      telefono: formTelefono.trim(),
+      email: formEmail.trim(),
       ultimaCita: editingPatient?.ultimaCita || 'Hoy',
       proximaCita: formProximaCita.trim() || 'Oct 24',
       estado: formEstado,
@@ -273,12 +281,18 @@ export const PatientsDirectoryView: React.FC<PatientsDirectoryViewProps> = ({
                   <select
                     value={formGenero}
                     onChange={(e) =>
-                      setFormGenero(e.target.value as 'Masculino' | 'Femenino')
+                      setFormGenero(
+                        e.target.value as
+                          | 'Masculino'
+                          | 'Femenino'
+                          | 'No especificado'
+                      )
                     }
                     className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366] bg-white"
                   >
                     <option value="Masculino">Masculino</option>
                     <option value="Femenino">Femenino</option>
+                    <option value="No especificado">No especificado</option>
                   </select>
                 </div>
               </div>
@@ -302,6 +316,30 @@ export const PatientsDirectoryView: React.FC<PatientsDirectoryViewProps> = ({
                     type="text"
                     value={formCiudad}
                     onChange={(e) => setFormCiudad(e.target.value)}
+                    className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-[#003366] mb-1">
+                    Teléfono (opcional):
+                  </label>
+                  <input
+                    type="tel"
+                    value={formTelefono}
+                    onChange={(e) => setFormTelefono(e.target.value)}
+                    className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#003366] mb-1">
+                    Email (opcional):
+                  </label>
+                  <input
+                    type="email"
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
                     className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366]"
                   />
                 </div>

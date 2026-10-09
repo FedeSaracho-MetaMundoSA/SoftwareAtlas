@@ -2,27 +2,15 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "ATLAS preview (install and run)",
+			"label": "Locate psychological field",
 			"type": "shell",
 			"command": "powershell.exe",
 			"args": [
 				"-NoProfile",
 				"-Command",
-				"npm.cmd install; if ($?) { npm.cmd run dev }"
+				"Select-String -Path src\\components\\ConsultationWizard.tsx -Pattern 'Ansioso|Colaborador|Defensivo' -Context 4,5"
 			],
-			"isBackground": true,
-			"problemMatcher": []
-		},
-		{
-			"label": "ATLAS preview compat",
-			"type": "shell",
-			"command": "powershell.exe",
-			"args": [
-				"-NoProfile",
-				"-Command",
-				"npm.cmd install --legacy-peer-deps --no-package-lock; if ($?) { npm.cmd run dev }"
-			],
-			"isBackground": true,
+			"isBackground": false,
 			"problemMatcher": []
 		}
 	]

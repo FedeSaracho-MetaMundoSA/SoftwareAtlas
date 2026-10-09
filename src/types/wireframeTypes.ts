@@ -32,7 +32,7 @@ export interface PatientRecord {
   nombreCompleto: string;
   fechaNacimiento?: string;
   edad: number;
-  genero: 'Masculino' | 'Femenino';
+  genero: 'Masculino' | 'Femenino' | 'No especificado';
   perfilGrupo?: PatientProfileGroup;
   profesion: string;
   ciudad: string;
@@ -92,7 +92,7 @@ export interface ConsultationRecord {
   pacienteId: string;
   pacienteNombre: string;
   pacienteEdad: number;
-  pacienteGenero: 'Masculino' | 'Femenino';
+  pacienteGenero: 'Masculino' | 'Femenino' | 'No especificado';
   perfilGrupo?: PatientProfileGroup;
   pacienteProfesion: string;
   pacienteCiudad: string;
@@ -175,7 +175,7 @@ export interface ConsultationRecord {
       impactoFuncional: string;
     };
     pruebaPsicologica?: {
-      actitud: 'Colaborador' | 'Defensivo' | 'Ansioso';
+      actitud: 'Colaborador' | 'Defensivo' | 'Ansioso' | 'No evaluado';
       humor: 'Neutral' | 'Ansioso' | 'Deprimido' | 'Eufórico';
       eventosVitales: string;
       medicacionPsicotropa: string;

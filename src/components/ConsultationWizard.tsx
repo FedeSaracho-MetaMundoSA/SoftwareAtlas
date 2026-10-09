@@ -63,7 +63,7 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
   const [showLiveScribePanel, setShowLiveScribePanel] = useState<boolean>(true);
   const [liveTranscript, setLiveTranscript] = useState<string>(
     initialConsultationToEdit?.transcripcionCharla ||
-      `[00:02] Juan Antonio Villalba (MP 542): Buen día, bienvenido al consultorio ATLAS. Contame por favor tu nombre y apellido, tu edad y a qué te dedicás acá en Salta.\n[00:10] Paciente: Hola Juan Antonio, mi nombre es Juan García López, tengo 29 años, soy contador y vivo en Salta capital.\n[00:19] Juan Antonio Villalba (MP 542): ¿Cuántas horas estás sentado por día frente a la computadora y con el celular, y qué te trae hoy a la consulta?\n[00:28] Paciente: Estoy sentado 8 horas por día, 7 horas frente a la computadora y 5 horas con el celular. Hace 3 meses siento la cintura trabada al levantarme de la silla y un pinchazo lumbar derecho al agacharme.\n[00:46] Juan Antonio Villalba (MP 542): Evaluando en cámara y camilla: aunque sientas el dolor en L4-L5, el eje principal es tu cadera (centro de gravedad). Tenés anteversión ilíaca derecha y flexión limitada a 30°. Mientras te palpo te explico: el nervio ciático sale de tu cintura y va hasta tu pie.`
+      ''
   );
   const [informeCompletoCharla, setInformeCompletoCharla] = useState<
     ConsultationRecord['informeCompletoCharla']
@@ -83,13 +83,17 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
 
   // Campos para crear paciente nuevo en Paso 1 (con DOB y cálculo automático de edad)
   const [newPatNombre, setNewPatNombre] = useState('');
-  const [newPatDob, setNewPatDob] = useState('1995-05-15');
-  const [newPatEdad, setNewPatEdad] = useState(29);
-  const [newPatGenero, setNewPatGenero] = useState<'Masculino' | 'Femenino'>(
-    'Masculino'
+  const [newPatDob, setNewPatDob] = useState('');
+  const [newPatEdad, setNewPatEdad] = useState(0);
+  const [newPatGenero, setNewPatGenero] = useState<
+    'Masculino' | 'Femenino' | 'No especificado'
+  >(
+    'No especificado'
   );
   const [newPatProfesion, setNewPatProfesion] = useState('');
   const [newPatCiudad, setNewPatCiudad] = useState('Salta');
+  const [newPatTelefono, setNewPatTelefono] = useState('');
+  const [newPatEmail, setNewPatEmail] = useState('');
 
   const selectedPatient =
     patients.find((p) => p.id === selectedPatientId) || patients[0];
@@ -254,10 +258,10 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
       ?.medicacionPsicotropa || 'Ninguno (Sin psicofármacos activos)'
   );
   const [actitudPsicologica, setActitudPsicologica] = useState<
-    'Colaborador' | 'Defensivo' | 'Ansioso'
+    'Colaborador' | 'Defensivo' | 'Ansioso' | 'No evaluado'
   >(
     initialConsultationToEdit?.evaluacionClinica.pruebaPsicologica?.actitud ||
-      'Colaborador'
+      'No evaluado'
   );
 
   // PASO 4: Visor DICOM y Análisis de Imágenes (Fase 3: 3.1 a 3.3)
@@ -467,11 +471,23 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
   // Cálculo automático de edad al cambiar Fecha de Nacimiento
   const handleDobChange = (dobStr: string) => {
     setNewPatDob(dobStr);
-    const birthYear = Number(dobStr.slice(0, 4));
-    if (birthYear > 1900 && birthYear <= 2026) {
-      const calculated = Math.max(1, 2024 - birthYear);
-      setNewPatEdad(calculated);
+    if (!dobStr) return;
+    const birthDate = new Date(`${dobStr}T00:00:00`);
+    const today = new Date();
+    if (Number.isNaN(birthDate.getTime()) || birthDate > today) {
+      setNewPatEdad(0);
+      return;
     }
+
+    let age = today.getFullYear() - birthDate.getFullYear();
+    if (
+      today.getMonth() < birthDate.getMonth() ||
+      (today.getMonth() === birthDate.getMonth() &&
+        today.getDate() < birthDate.getDate())
+    ) {
+      age -= 1;
+    }
+    setNewPatEdad(age);
   };
 
   // Timer de grabación en Paso 2
@@ -644,8 +660,8 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
           perfilGrupo,
           profesion: profesion || newPatProfesion || 'Particular',
           ciudad: ciudad || newPatCiudad || 'Salta',
-          telefono: '+54 387 481-6999',
-          email: 'paciente@atlasquiropraxia.com',
+          telefono: newPatTelefono.trim(),
+          email: newPatEmail.trim(),
           ultimaCita: 'Hoy',
           proximaCita: 'Oct 17',
           estado: 'Tratamiento',
@@ -864,6 +880,12 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     setNewPatGenero(payload.datosPaciente.genero);
     setNewPatProfesion(payload.datosPaciente.profesion);
     setNewPatCiudad(payload.datosPaciente.ciudad);
+    if (payload.datosPaciente.telefono) {
+      setNewPatTelefono(payload.datosPaciente.telefono);
+    }
+    if (payload.datosPaciente.email) {
+      setNewPatEmail(payload.datosPaciente.email);
+    }
 
     // Paso 2: Anamnesis
     setPerfilGrupo(payload.datosPaciente.perfilGrupo);
@@ -872,7 +894,12 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     setHorasSedentario(payload.datosPaciente.horasSedentarioDia);
     setHorasComputadora(payload.datosPaciente.horasComputadoraDia);
     setHorasSmartphone(payload.datosPaciente.horasSmartphoneDia);
-    setProblemaHoy(payload.anamnesisExtraida.problemaDeHoy);
+    if (
+      payload.anamnesisExtraida.problemaDeHoy !==
+      'Pendiente de completar por el profesional.'
+    ) {
+      setProblemaHoy(payload.anamnesisExtraida.problemaDeHoy);
+    }
     if (payload.anamnesisExtraida.diccionarioCliente?.length) {
       setDiccionarioKeywords(
         payload.anamnesisExtraida.diccionarioCliente.join(' | ')
@@ -880,11 +907,11 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
     }
     setAntecedentes((prev) => ({
       ...prev,
-      escoliosis: payload.anamnesisExtraida.escoliosis,
-      cifosis: payload.anamnesisExtraida.cifosis,
-      lordosis: payload.anamnesisExtraida.lordosis,
-      asma: payload.anamnesisExtraida.asma,
-      tiroides: payload.anamnesisExtraida.tiroides,
+      escoliosis: payload.anamnesisExtraida.escoliosis || prev.escoliosis,
+      cifosis: payload.anamnesisExtraida.cifosis || prev.cifosis,
+      lordosis: payload.anamnesisExtraida.lordosis || prev.lordosis,
+      asma: payload.anamnesisExtraida.asma || prev.asma,
+      tiroides: payload.anamnesisExtraida.tiroides || prev.tiroides,
       otrosTexto:
         payload.anamnesisExtraida.otrosAntecedentes || prev.otrosTexto,
       asimetriaPiernas:
@@ -912,24 +939,47 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
         payload.evaluacionExtraida.notasTiempoReal.join('\n')
       );
     }
-    if (payload.evaluacionExtraida.ejeCaderaCentroGravedad) {
+    if (
+      payload.evaluacionExtraida.ejeCaderaCentroGravedad !==
+      'Pendiente de revisión clínica.'
+    ) {
       setEjeCaderaHallazgo(payload.evaluacionExtraida.ejeCaderaCentroGravedad);
     }
-    if (payload.evaluacionExtraida.relatoNervioCiatico) {
+    if (
+      payload.evaluacionExtraida.relatoNervioCiatico !==
+      'Pendiente de revisión clínica.'
+    ) {
       setRelatoCiatico(payload.evaluacionExtraida.relatoNervioCiatico);
     }
     if (payload.evaluacionExtraida.actitudPsicologica) {
       setActitudPsicologica(payload.evaluacionExtraida.actitudPsicologica);
     }
-    if (payload.evaluacionExtraida.medicacionPsicotropa) {
+    if (
+      payload.evaluacionExtraida.medicacionPsicotropa !== 'No informado.'
+    ) {
       setMedicacionPsicotropa(payload.evaluacionExtraida.medicacionPsicotropa);
     }
 
     // Paso 5: Protocolo
-    setDiagnosticoPrincipal(payload.protocoloExtraido.diagnosticoPrincipal);
-    setDiagnosticoSecundario(payload.protocoloExtraido.diagnosticoSecundario);
-    setEtiologia(payload.protocoloExtraido.etiologia);
-    setDdConfirmada(payload.protocoloExtraido.diagnosticoPrincipal);
+    if (
+      payload.protocoloExtraido.diagnosticoPrincipal !==
+      'Pendiente de evaluación profesional.'
+    ) {
+      setDiagnosticoPrincipal(payload.protocoloExtraido.diagnosticoPrincipal);
+      setDdConfirmada(payload.protocoloExtraido.diagnosticoPrincipal);
+    }
+    if (
+      payload.protocoloExtraido.diagnosticoSecundario !==
+      'Pendiente de revisión clínica.'
+    ) {
+      setDiagnosticoSecundario(payload.protocoloExtraido.diagnosticoSecundario);
+    }
+    if (
+      payload.protocoloExtraido.etiologia !==
+      'Pendiente de revisión clínica.'
+    ) {
+      setEtiologia(payload.protocoloExtraido.etiologia);
+    }
 
     setFase1((prev) => ({
       ...prev,
@@ -1218,13 +1268,17 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                     value={newPatGenero}
                     onChange={(e) =>
                       setNewPatGenero(
-                        e.target.value as 'Masculino' | 'Femenino'
+                        e.target.value as
+                          | 'Masculino'
+                          | 'Femenino'
+                          | 'No especificado'
                       )
                     }
                     className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366] bg-white"
                   >
                     <option value="Masculino">Masculino</option>
                     <option value="Femenino">Femenino</option>
+                    <option value="No especificado">No especificado</option>
                   </select>
                 </div>
                 <div>
@@ -1250,6 +1304,28 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                     className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366]"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#003366] mb-1">
+                    Teléfono (opcional):
+                  </label>
+                  <input
+                    type="tel"
+                    value={newPatTelefono}
+                    onChange={(e) => setNewPatTelefono(e.target.value)}
+                    className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#003366] mb-1">
+                    Email (opcional):
+                  </label>
+                  <input
+                    type="email"
+                    value={newPatEmail}
+                    onChange={(e) => setNewPatEmail(e.target.value)}
+                    className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366]"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -1258,6 +1334,12 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
             <button
               type="button"
               onClick={() => {
+                if (
+                  patientMode === 'nuevo' &&
+                  (!newPatNombre.trim() || newPatEdad < 1)
+                ) {
+                  return;
+                }
                 if (patientMode === 'nuevo' && newPatNombre.trim()) {
                   const newId = `pat-${Date.now()}`;
                   const grupoAuto: PatientProfileGroup =
@@ -1279,8 +1361,8 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                     perfilGrupo: grupoAuto,
                     profesion: newPatProfesion.trim() || 'Particular',
                     ciudad: newPatCiudad.trim() || 'Salta',
-                    telefono: '+54 387 400-0000',
-                    email: 'paciente@email.com',
+                    telefono: newPatTelefono.trim(),
+                    email: newPatEmail.trim(),
                     ultimaCita: 'Hoy',
                     proximaCita: 'Oct 17',
                     estado: 'Evaluación Inicial',
@@ -1296,7 +1378,11 @@ export const ConsultationWizard: React.FC<ConsultationWizardProps> = ({
                 }
                 setStep(2);
               }}
-              className="px-6 py-2.5 bg-[#1a5490] hover:bg-[#003366] text-white font-bold text-sm cursor-pointer"
+              disabled={
+                patientMode === 'nuevo' &&
+                (!newPatNombre.trim() || newPatEdad < 1)
+              }
+              className="px-6 py-2.5 bg-[#1a5490] hover:bg-[#003366] text-white font-bold text-sm cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               [SIGUIENTE &gt;&gt;&gt;]
             </button>

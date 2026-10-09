@@ -21,11 +21,12 @@ export interface ScribeExtractedPayload {
     apellidos: string;
     edad: number;
     fechaNacimientoEstimada?: string;
-    genero: 'Masculino' | 'Femenino';
+    genero: 'Masculino' | 'Femenino' | 'No especificado';
     perfilGrupo: PatientProfileGroup;
     profesion: string;
     ciudad: string;
     telefono?: string;
+    email?: string;
     horasSedentarioDia: number;
     horasComputadoraDia: number;
     horasSmartphoneDia: number;
@@ -50,7 +51,7 @@ export interface ScribeExtractedPayload {
     notasTiempoReal: string[];
     ejeCaderaCentroGravedad: string;
     relatoNervioCiatico: string;
-    actitudPsicologica: 'Colaborador' | 'Ansioso' | 'Defensivo';
+    actitudPsicologica: 'Colaborador' | 'Ansioso' | 'Defensivo' | 'No evaluado';
     medicacionPsicotropa: string;
     flexionAnteriorGrados?: string;
     fuerzaGluteos?: string;
@@ -129,8 +130,8 @@ export function parseLiveTranscriptLocally(
   const clean = text.trim();
 
   // 1. Extraer nombre y apellido
-  let nombre = 'Juan';
-  let apellidos = 'García López';
+  let nombre = '';
+  let apellidos = '';
   const nameMatch =
     clean.match(
       /(?:me llamo|mi nombre es|soy)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3})/i
@@ -153,24 +154,31 @@ export function parseLiveTranscriptLocally(
   }
 
   // 2. Extraer edad
-  let edad = 29;
+  let edad = 0;
   const ageMatch = clean.match(/tengo\s+(\d{1,2})\s*años|(\d{1,2})\s*años/i);
   if (ageMatch) {
-    edad = Number(ageMatch[1] || ageMatch[2]) || 29;
+    edad = Number(ageMatch[1] || ageMatch[2]) || 0;
   }
 
   // 3. Extraer género y perfil
   const lower = clean.toLowerCase();
-  const isFemale =
-    /soy\s+(?:contadora|profesora|docente|arquitecta|abogada|enfermera|médica|mujer|mamá)|valeria|maría|laura|ana|sofía|camila|lucía/i.test(
-      clean
-    );
-  const genero: 'Masculino' | 'Femenino' = isFemale ? 'Femenino' : 'Masculino';
+  const genderMatch = clean.match(
+    /\b(masculino|femenino|hombre|mujer|varón|varon)\b/i
+  );
+  const genero: 'Masculino' | 'Femenino' | 'No especificado' = genderMatch
+    ? /femenino|mujer/i.test(genderMatch[1])
+      ? 'Femenino'
+      : 'Masculino'
+    : 'No especificado';
   const perfilGrupo: PatientProfileGroup =
-    edad < 16 ? 'NIÑO' : genero === 'Femenino' ? 'MUJER_ADULTA' : 'ADULTO';
+    edad > 0 && edad < 16
+      ? 'NIÑO'
+      : genero === 'Femenino'
+      ? 'MUJER_ADULTA'
+      : 'ADULTO';
 
   // 4. Extraer profesión
-  let profesion = edad < 16 ? 'Estudiante' : 'Contador';
+  let profesion = edad > 0 && edad < 16 ? 'Estudiante' : 'No especificada';
   const profMatch = clean.match(
     /soy\s+(contador(?:a)?(?:\s+y\s+docente)?|arquitecto(?:a)?|profesor(?:a)?|docente|estudiante|abogado(?:a)?|ingeniero(?:a)?|comerciante|administrativo(?:a)?|chofer|médico(?:a)?|odontólogo(?:a)?)/i
   );
@@ -180,7 +188,7 @@ export function parseLiveTranscriptLocally(
   }
 
   // 5. Extraer ciudad
-  let ciudad = 'Salta';
+  let ciudad = '';
   const cityMatch = clean.match(
     /vivo\s+(?:acá\s+)?en\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i
   );
@@ -194,9 +202,9 @@ export function parseLiveTranscriptLocally(
   const pcMatch = clean.match(/(\d{1,2})\s*horas?\s*(?:frente\s*a\s*)?(?:la\s*)?(?:computadora|pc|pantallas)/i);
   const phoneMatch = clean.match(/(\d{1,2})\s*horas?\s*(?:con\s*el\s*|en\s*el\s*|de\s*)?(?:celular|smartphone)/i);
 
-  const horasSedentarioDia = sedMatch ? Number(sedMatch[1]) : 8;
-  const horasComputadoraDia = pcMatch ? Number(pcMatch[1]) : 7;
-  const horasSmartphoneDia = phoneMatch ? Number(phoneMatch[1]) : 5;
+  const horasSedentarioDia = sedMatch ? Number(sedMatch[1]) : 0;
+  const horasComputadoraDia = pcMatch ? Number(pcMatch[1]) : 0;
+  const horasSmartphoneDia = phoneMatch ? Number(phoneMatch[1]) : 0;
 
   // 7. Antecedentes
   const escoliosis = lower.includes('escoliosis') || lower.includes('escoliótica');
@@ -219,40 +227,20 @@ export function parseLiveTranscriptLocally(
   if (lower.includes('hombro derecho más alto')) {
     diccionarioCliente.push('Hombro derecho más alto');
   }
-  if (diccionarioCliente.length === 0) {
-    diccionarioCliente.push(
-      'Molestia mecánica vertebral asociada a postura mantenida'
-    );
-  }
-
-  // 9. Problema de hoy y diagnóstico
-  const problemaDeHoy =
-    perfilGrupo === 'NIÑO'
-      ? `Evaluación de crecimiento espinal en paciente de ${edad} años (${profesion}). Refiere fatiga dorsal por mochila escolar y uso de pantallas (${horasSmartphoneDia}h celular/día), con asimetría de hombros.`
-      : perfilGrupo === 'MUJER_ADULTA'
-      ? `Paciente de ${edad} años (${profesion}) refiere sobrecarga cérvico-dorsal y lumbopélvica asociada a jornada frente a pantallas (${horasComputadoraDia}h PC) y exigencia postural diaria.`
-      : `Paciente de ${edad} años (${profesion}) consulta por dolor mecánico lumbopélvico de evolución subaguda, originado por sedentarismo (${horasSedentarioDia}h/día sentado y ${horasComputadoraDia}h en computadora), con irradiación proximal hacia glúteo.`;
-
-  const diagnosticoPrincipal =
-    perfilGrupo === 'NIÑO'
-      ? 'Actitud escoliótica juvenil funcional con oblicuidad pélvica'
-      : perfilGrupo === 'MUJER_ADULTA'
-      ? 'Síndrome postural cérvico-dorsal y desbalance sacroilíaco'
-      : 'Síndrome facetario lumbar L4-L5 y disfunción del eje de cadera';
-
-  const birthYear = 2026 - edad;
+  const problemaDeHoy = 'Pendiente de completar por el profesional.';
+  const diagnosticoPrincipal = 'Pendiente de evaluación profesional.';
+  const requiereRevision = 'Pendiente de revisión clínica.';
 
   return {
     datosPaciente: {
       nombre,
       apellidos,
       edad,
-      fechaNacimientoEstimada: `${birthYear}-05-15`,
       genero,
       perfilGrupo,
       profesion,
       ciudad,
-      telefono: '+54 387 481-6999',
+      telefono: '',
       horasSedentarioDia,
       horasComputadoraDia,
       horasSmartphoneDia,
@@ -265,68 +253,42 @@ export function parseLiveTranscriptLocally(
       lordosis,
       asma,
       tiroides,
-      otrosAntecedentes: `Sedentarismo ${horasSedentarioDia}h/día · PC ${horasComputadoraDia}h/día`,
-      asimetriaPiernas: 'Acortamiento funcional derecho 5-6 mm',
-      desviacionCadera: true,
-      pesoMochilaKg: perfilGrupo === 'NIÑO' ? 6.0 : undefined,
-      posturaEscolar:
-        perfilGrupo === 'NIÑO'
-          ? '6h sentado en pupitre + celular en cama'
-          : undefined,
-      cantidadHijos: perfilGrupo === 'MUJER_ADULTA' ? 3 : undefined,
-      nivelSobrecarga1a10: perfilGrupo === 'MUJER_ADULTA' ? 8 : undefined,
+      otrosAntecedentes: '',
     },
     evaluacionExtraida: {
-      notasTiempoReal: [
-        `Paciente: ${nombre} ${apellidos} (${edad} años, ${profesion})`,
-        'Eje Cadera: Basculación ilíaca evaluada como centro de gravedad primario',
-        'Columna: Sobrecarga segmentaria L4-L5 y compensación dorsal',
-        'Recorrido Ciático: Explicado en tiempo real de cintura a pie',
-        'Flexión anterior: 35° | Fuerza glútea: 4/5',
-      ],
-      ejeCaderaCentroGravedad:
-        'Evaluado por Juan Antonio Villalba (MP 542): el bloqueo en anteversión de cadera desplaza el centro de gravedad anteriorizando la carga sobre L4-L5.',
-      relatoNervioCiatico:
-        'Se educa al paciente en camilla explicando cómo el nervio ciático nace en la columna lumbosacra y desciende por el glúteo hasta el pie.',
-      actitudPsicologica: 'Colaborador',
-      medicacionPsicotropa: 'Ninguno (Sin psicofármacos activos)',
-      flexionAnteriorGrados: '35°',
-      fuerzaGluteos: '4/5',
+      notasTiempoReal:
+        nombre || apellidos ? [`Paciente: ${nombre} ${apellidos}`.trim()] : [],
+      ejeCaderaCentroGravedad: requiereRevision,
+      relatoNervioCiatico: requiereRevision,
+      actitudPsicologica: 'No evaluado',
+      medicacionPsicotropa: 'No informado.',
+      flexionAnteriorGrados: '',
+      fuerzaGluteos: '',
     },
     protocoloExtraido: {
       diagnosticoPrincipal,
-      diagnosticoSecundario:
-        'Secundario a desbalance del eje de cadera y sobrecarga estática frente a pantallas',
-      etiologia: `Sedentarismo (${horasSedentarioDia}h/día) + Computadora (${horasComputadoraDia}h/día) + Smartphone (${horasSmartphoneDia}h/día)`,
-      fase1Ajustes: '2x/semana (Ajuste de eje de cadera, sacro y segmento L4-L5 / C1)',
-      fase1Complementos: 'Liberación miofascial de psoas e isquiotibiales',
-      fase1Restriccion: 'Evitar flexión extrema y cargas > 10 kg',
-      fase2Ajustes: '1x/semana (Estabilización lumbopélvica)',
-      fase2Ejercicios: '3x/semana (Glute Bridge, Bird Dog, Cat-Cow)',
-      fase2Ergonomia: 'Monitor a altura visual (75 cm) y pausas activas cada 45 min',
-      fase3Ajustes: '1x/mes (Mantenimiento preventivo)',
-      fase3EjerciciosCasa: '5x/semana (5-7 min de higiene espinal)',
-      fase3Educacion: 'Reeducación postural y control del eje de cadera',
-      objetivosCortoPlazo: [
-        'Dolor: 8→3 (escala EVA)',
-        'Flexión anterior: 35→65°',
-        'Desbloquear eje de cadera y reducir rigidez matutina',
-      ],
-      objetivosLargoPlazo: [
-        'Mantener columna estable sin recaídas',
-        'Fuerza glútea y core 5/5',
-        'Alineación postural normolordótica',
-      ],
+      diagnosticoSecundario: requiereRevision,
+      etiologia: requiereRevision,
+      fase1Ajustes: requiereRevision,
+      fase1Complementos: requiereRevision,
+      fase1Restriccion: requiereRevision,
+      fase2Ajustes: requiereRevision,
+      fase2Ejercicios: requiereRevision,
+      fase2Ergonomia: requiereRevision,
+      fase3Ajustes: requiereRevision,
+      fase3EjerciciosCasa: requiereRevision,
+      fase3Educacion: requiereRevision,
+      objetivosCortoPlazo: [],
+      objetivosLargoPlazo: [],
     },
     informeCompletoCharla: {
       tituloInforme: `INFORME CLÍNICO INTEGRAL DE CHARLA EN VIVO — ${nombre.toUpperCase()} ${apellidos.toUpperCase()}`,
-      resumenConversacion: `Entrevista clínica realizada por el propietario titular Juan Antonio Villalba (MP 542) con cámara y micrófono conectados en tiempo real. Se identifica a ${nombre} ${apellidos}, de ${edad} años (${genero}, ${profesion} en ${ciudad}). Durante el diálogo el paciente describe su motivo de consulta y rutina diaria (${horasSedentarioDia}h sedentario, ${horasComputadoraDia}h PC, ${horasSmartphoneDia}h smartphone).`,
+      resumenConversacion: clean,
       anamnesisNarrativa: `${problemaDeHoy} Frases clave registradas en el diccionario del paciente: ${diccionarioCliente.join(
         ' | '
       )}.`,
-      correlacionBiomecanicaEjeCadera:
-        'Durante la exploración frente a cámara y en camilla, Juan Antonio Villalba (MP 542) demuestra cómo el eje principal de la cadera (centro de gravedad) condiciona la alineación vertebral y explica simultáneamente al paciente el recorrido del nervio ciático desde la cintura hasta el pie.',
-      planTerapeuticoDetallado: `Se establece protocolo personalizado en 4 fases para ${diagnosticoPrincipal}: Fase 1 de descompresión y nivelación de cadera (2x/sem), Fase 2 de fortalecimiento glúteo/core y ergonomía (8 sem), Fase 3 de prevención mensual y Fase 4 de optimización funcional.`,
+      correlacionBiomecanicaEjeCadera: requiereRevision,
+      planTerapeuticoDetallado: requiereRevision,
     },
   };
 }
@@ -621,19 +583,25 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
       });
 
       const data = await response.json();
-      if (response.ok && data.transcript) {
+      if (
+        response.ok &&
+        typeof data.transcript === 'string' &&
+        data.transcript.trim()
+      ) {
         const merged = `${transcript}\n${data.transcript}`.trim();
         onTranscriptChange(merged);
         await handleProcessFullConversationWithAI(merged);
       } else {
         setStatusBanner(
-          data.error ||
-            'Audio procesado localmente. Ejecutando autocompletado clínico...'
+          typeof data.error === 'string'
+            ? `No se pudo transcribir el audio: ${data.error}`
+            : 'El servicio no devolvió una transcripción. El audio no se procesó.'
         );
-        await handleProcessFullConversationWithAI(transcript);
       }
-    } catch {
-      await handleProcessFullConversationWithAI(transcript);
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : 'error de conexión desconocido';
+      setStatusBanner(`No se pudo enviar el audio para transcripción: ${reason}.`);
     } finally {
       setIsTranscribingAudioBlob(false);
     }
@@ -683,7 +651,9 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
             genero:
               data.extracted.datosPaciente?.genero === 'Femenino'
                 ? 'Femenino'
-                : 'Masculino',
+                : data.extracted.datosPaciente?.genero === 'Masculino'
+                ? 'Masculino'
+                : 'No especificado',
             perfilGrupo:
               data.extracted.datosPaciente?.perfilGrupo === 'NIÑO' ||
               data.extracted.datosPaciente?.perfilGrupo === 'MUJER_ADULTA' ||
@@ -712,16 +682,20 @@ export const LiveClinicalScribePanel: React.FC<LiveClinicalScribePanelProps> = (
         setAutoDetectedFields(aiPayload);
         onApplyExtractedData(aiPayload, textToAnalyze);
         setStatusBanner(
-          `✓ ¡Autocompletado e Informe Completo listos! Paciente detectado: ${aiPayload.datosPaciente.nombre} ${aiPayload.datosPaciente.apellidos} (${aiPayload.datosPaciente.edad} años, ${aiPayload.datosPaciente.genero}, ${aiPayload.datosPaciente.profesion}).`
+          'Borrador asistido por IA generado. Verificá y corregí identidad, antecedentes, hallazgos y todo contenido clínico antes de guardar.'
         );
       } else {
         setStatusBanner(
-          `✓ Datos fundamentales autocompletados e Informe Completo generado para ${immediateLocal.datosPaciente.nombre} ${immediateLocal.datosPaciente.apellidos} (${immediateLocal.datosPaciente.edad} años).`
+          typeof data.error === 'string'
+            ? `No se pudo completar el borrador con IA: ${data.error}. Las sugerencias locales requieren revisión.`
+            : 'El servicio de IA no devolvió datos estructurados. Las sugerencias locales requieren revisión.'
         );
       }
-    } catch {
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : 'error de conexión desconocido';
       setStatusBanner(
-        `✓ Datos fundamentales autocompletados e Informe Completo generado para ${immediateLocal.datosPaciente.nombre} ${immediateLocal.datosPaciente.apellidos} (${immediateLocal.datosPaciente.edad} años).`
+        `No se pudo completar el borrador con IA: ${reason}. Las sugerencias locales requieren revisión.`
       );
     } finally {
       setIsProcessingGemini(false);

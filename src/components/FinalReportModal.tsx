@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Check,
   Download,
   FileText,
   Mail,
@@ -36,20 +35,10 @@ export const FinalReportModal: React.FC<FinalReportModalProps> = ({
     ) || consultation.imagenes.estudiosHistorial[0];
 
   const handlePrintOrDownload = () => {
+    setActionStatus(
+      'En el diálogo de impresión, elegí «Guardar como PDF» para descargar una copia.'
+    );
     window.print();
-    setActionStatus('Documento enviado a impresión / guardado como PDF.');
-  };
-
-  const handleSendEmail = () => {
-    setActionStatus(
-      `Reporte clínico enviado por correo electrónico al paciente (${consultation.pacienteNombre}).`
-    );
-  };
-
-  const handleShareLink = () => {
-    setActionStatus(
-      'Enlace seguro y confidencial copiado al portapapeles para compartir con el paciente.'
-    );
   };
 
   const ddVisual = consultation.imagenes.diagnosticoDiferencialVisual;
@@ -73,7 +62,7 @@ export const FinalReportModal: React.FC<FinalReportModalProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#27AE60] hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>[Descargar PDF]</span>
+            <span>[Guardar como PDF]</span>
           </button>
           <button
             type="button"
@@ -85,19 +74,21 @@ export const FinalReportModal: React.FC<FinalReportModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={handleSendEmail}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#3498DB] hover:bg-sky-600 text-white text-xs font-bold cursor-pointer"
+            disabled
+            title="Requiere configurar un servicio de correo en el servidor"
+            className="inline-flex cursor-not-allowed items-center gap-1.5 bg-slate-500 px-3 py-1.5 text-xs font-bold text-white opacity-70"
           >
             <Mail className="w-3.5 h-3.5" />
-            <span>[Enviar por Email]</span>
+            <span>[Email no configurado]</span>
           </button>
           <button
             type="button"
-            onClick={handleShareLink}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/40 text-white text-xs font-bold hover:bg-white/10 cursor-pointer"
+            disabled
+            title="Los enlaces seguros requieren autenticación y almacenamiento protegidos"
+            className="inline-flex cursor-not-allowed items-center gap-1.5 border border-white/40 px-3 py-1.5 text-xs font-bold text-white opacity-60"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>[Enlace Seguro]</span>
+            <span>[Compartir no configurado]</span>
           </button>
           <button
             type="button"
@@ -155,11 +146,11 @@ export const FinalReportModal: React.FC<FinalReportModalProps> = ({
       </div>
 
       {actionStatus && (
-        <div className="px-6 py-2.5 bg-emerald-50 border-b border-[#27AE60] text-xs font-bold text-[#27AE60] flex items-center justify-between no-print">
-          <span className="flex items-center gap-1.5">
-            <Check className="w-4 h-4" />
-            {actionStatus}
-          </span>
+        <div
+          role="status"
+          className="flex items-center justify-between border-b border-sky-300 bg-sky-50 px-6 py-2.5 text-xs font-bold text-sky-900 no-print"
+        >
+          <span>{actionStatus}</span>
           <button
             type="button"
             onClick={() => setActionStatus(null)}

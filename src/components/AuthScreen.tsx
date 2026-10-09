@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ShieldCheck, UserPlus } from 'lucide-react';
+import { Mail, UserPlus } from 'lucide-react';
 import { DoctorProfile } from '../types/wireframeTypes';
 
 interface AuthScreenProps {
@@ -11,28 +11,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   doctor,
   onLoginSuccess,
 }) => {
-  const [mode, setMode] = useState<'login' | 'registro' | 'recuperar' | '2fa'>(
-    'login'
-  );
+  const [mode, setMode] = useState<'login' | 'registro' | 'recuperar'>('login');
   const [email, setEmail] = useState(doctor.email || 'doctor@quiropraxia.com');
-  const [password, setPassword] = useState('••••••••••');
   const [nombreRegistro, setNombreRegistro] = useState('Dr. Juan García');
   const [clinicaRegistro, setClinicaRegistro] = useState(
     'Mi Clínica — ATLAS Columna Vertebral'
   );
-  const [twoFactorCode, setTwoFactorCode] = useState('482910');
-  const [require2FA, setRequire2FA] = useState(doctor.twoFactorEnabled);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const handleSubmitLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (require2FA) {
-      setMode('2fa');
-      return;
-    }
     onLoginSuccess({
       ...doctor,
-      email: email.trim() || 'doctor@quiropraxia.com',
+      email: email.trim(),
     });
   };
 
@@ -40,24 +31,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     e.preventDefault();
     onLoginSuccess({
       ...doctor,
-      nombre: nombreRegistro.trim() || 'Dr. Juan García',
-      email: email.trim() || 'doctor@quiropraxia.com',
-      clinica: clinicaRegistro.trim() || 'Mi Clínica',
+      nombre: nombreRegistro.trim(),
+      email: email.trim(),
+      clinica: clinicaRegistro.trim(),
     });
   };
 
   const handleSubmitRecovery = (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(
-      `Se ha enviado un enlace de recuperación de acceso a ${email}.`
+      'La recuperación de contraseña no está configurada. No se envió ningún correo.'
     );
-  };
-
-  const handleVerify2FA = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (twoFactorCode.trim().length >= 4) {
-      onLoginSuccess();
-    }
   };
 
   return (
@@ -72,13 +56,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <p className="text-xs text-slate-500 mt-1">
             ATLAS Columna Vertebral · Gestión Clínica Profesional
           </p>
+          <p
+            role="note"
+            className="mt-3 border border-amber-300 bg-amber-50 px-3 py-2 text-left text-xs font-semibold text-amber-900"
+          >
+            MODO DEMOSTRACIÓN: esta vista no autentica usuarios ni protege datos clínicos.
+          </p>
         </div>
 
         {/* Contenido según modo: Login / Registro / Recuperar / 2FA */}
         {mode === 'login' && (
           <form onSubmit={handleSubmitLogin} className="p-6 space-y-5">
             {statusMessage && (
-              <div className="p-3 bg-emerald-50 border border-[#27AE60] text-xs text-[#003366]">
+              <div role="status" className="border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
                 {statusMessage}
               </div>
             )}
@@ -100,55 +90,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-semibold text-[#003366]">
-                  Contraseña:
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStatusMessage(null);
-                    setMode('recuperar');
-                  }}
-                  className="text-xs text-[#3498DB] hover:underline font-medium"
-                >
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
-              <div className="relative">
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border-2 border-[#E0E0E0] px-3.5 py-2.5 text-sm text-[#003366] focus:border-[#1a5490] focus:outline-none"
-                />
-                <Lock className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-[#003366]">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={require2FA}
-                  onChange={(e) => setRequire2FA(e.target.checked)}
-                  className="w-4 h-4 accent-[#1a5490]"
-                />
-                <span>Verificar con 2FA (Dos Factores)</span>
-              </label>
-            </div>
-
             <button
               type="submit"
               className="w-full py-3 px-4 bg-[#1a5490] hover:bg-[#003366] text-white font-bold text-sm tracking-wide transition-colors cursor-pointer"
             >
-              INICIAR SESIÓN
+              INGRESAR A LA DEMOSTRACIÓN
             </button>
 
             <div className="pt-2 border-t border-[#E0E0E0] text-center text-sm text-[#003366]">
-              ¿No tienes cuenta?{' '}
+              ¿Necesitas actualizar el perfil local?{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -157,7 +107,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 }}
                 className="font-bold text-[#1a5490] hover:underline ml-1"
               >
-                CREAR CUENTA
+                CONFIGURAR PERFIL
               </button>
             </div>
           </form>
@@ -167,8 +117,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <form onSubmit={handleSubmitRegister} className="p-6 space-y-4">
             <div className="flex items-center gap-2 text-sm font-bold text-[#003366]">
               <UserPlus className="w-4 h-4 text-[#1a5490]" />
-              <span>CREAR CUENTA PROFESIONAL</span>
+              <span>CONFIGURAR PERFIL LOCAL</span>
             </div>
+            <p className="border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+              Esto solo actualiza el perfil guardado en este navegador; no crea una cuenta ni configura autenticación.
+            </p>
 
             <div>
               <label className="block text-xs font-semibold text-[#003366] mb-1">
@@ -209,24 +162,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-[#003366] mb-1">
-                Contraseña:
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border-2 border-[#E0E0E0] px-3 py-2 text-sm text-[#003366]"
-              />
-            </div>
-
             <button
               type="submit"
               className="w-full py-3 px-4 bg-[#27AE60] hover:bg-emerald-700 text-white font-bold text-sm tracking-wide transition-colors"
             >
-              REGISTRAR Y ACCEDER AL DASHBOARD
+              GUARDAR PERFIL LOCAL Y CONTINUAR
             </button>
 
             <div className="text-center text-xs pt-2">
@@ -247,7 +187,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               RECUPERAR CONTRASEÑA
             </h2>
             <p className="text-xs text-slate-600">
-              Ingresa tu correo registrado para recibir un código de restablecimiento seguro.
+              El servicio de recuperación todavía no está configurado.
             </p>
             <div>
               <label className="block text-xs font-semibold text-[#003366] mb-1">
@@ -263,16 +203,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </div>
 
             {statusMessage && (
-              <div className="p-3 bg-emerald-50 border border-[#27AE60] text-xs text-[#27AE60] font-medium">
+              <div role="status" className="border border-amber-300 bg-amber-50 p-3 text-xs font-medium text-amber-900">
                 {statusMessage}
               </div>
             )}
 
             <button
-              type="submit"
-              className="w-full py-2.5 px-4 bg-[#1a5490] text-white font-bold text-xs"
+              type="button"
+              disabled
+              className="w-full cursor-not-allowed bg-slate-200 px-4 py-2.5 text-xs font-bold text-slate-500"
             >
-              ENVIAR ENLACE DE RECUPERACIÓN
+              RECUPERACIÓN NO DISPONIBLE
             </button>
 
             <div className="text-center text-xs pt-2">
@@ -287,40 +228,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </form>
         )}
 
-        {mode === '2fa' && (
-          <form onSubmit={handleVerify2FA} className="p-6 space-y-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-[#003366]">
-              <ShieldCheck className="w-5 h-5 text-[#27AE60]" />
-              <span>VERIFICACIÓN EN DOS FACTORES (2FA)</span>
-            </div>
-            <p className="text-xs text-slate-600">
-              Ingresa el código de seguridad de 6 dígitos enviado al dispositivo de{' '}
-              <strong>{email}</strong>:
-            </p>
-            <input
-              type="text"
-              maxLength={6}
-              value={twoFactorCode}
-              onChange={(e) => setTwoFactorCode(e.target.value)}
-              className="w-full border-2 border-[#1a5490] px-4 py-3 text-center text-lg font-mono tracking-widest font-bold text-[#003366]"
-            />
-            <button
-              type="submit"
-              className="w-full py-3 px-4 bg-[#27AE60] text-white font-bold text-sm"
-            >
-              VERIFICAR Y ENTRAR
-            </button>
-            <div className="text-center text-xs">
-              <button
-                type="button"
-                onClick={() => setMode('login')}
-                className="text-slate-500 hover:text-[#003366]"
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        )}
       </div>
     </div>
   );

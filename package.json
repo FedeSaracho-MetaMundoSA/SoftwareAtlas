@@ -8,7 +8,8 @@
     "start": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; for (const path of ['dist', 'build', 'server.js']) rmSync(path, { recursive: true, force: true })\"",
+    "clean:deps": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('node_modules', { recursive: true, force: true })\"",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
